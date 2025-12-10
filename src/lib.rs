@@ -29,6 +29,9 @@ fn render_markdown(input: &str) -> String {
     let mut in_blockquote = false;
     let mut has_content = false;
     let mut prev_was_heading = false;
+    let mut blockquote_start: Option<usize> = None;
+    let mut blockquote_paragraphs: usize = 0;
+    let mut blockquote_pending_gap = false;
 
     // Preserve leading blank lines (pulldown_cmark skips them).
     let leading_blank = input.chars().take_while(|c| *c == '\n').count();
@@ -47,100 +50,122 @@ fn render_markdown(input: &str) -> String {
 
     for event in parser {
         match event {
-            Event::Start(tag) => match tag {
-                Tag::Paragraph => {
-                    prev_was_heading = false;
-                    if has_content && !in_list_item && !(in_blockquote && out.ends_with("**>")) {
-                        push_newline(&mut out, in_blockquote);
-                    }
-                }
-                Tag::Heading { level, .. } => {
-                    if has_content {
-                        if prev_was_heading {
-                            if !out.ends_with('\n') {
-                                push_newline(&mut out, in_blockquote);
-                            }
-                        } else if !out.ends_with("\n\n") {
-                            push_newline(&mut out, in_blockquote);
-                        }
-                    }
-                    out.push('*');
-                    has_content = true;
-                    prev_was_heading = true;
-                    match level {
-                        HeadingLevel::H1 => out.push_str("📌 "),
-                        HeadingLevel::H2 => out.push_str("✏ "),
-                        HeadingLevel::H3 => out.push_str("📚 "),
-                        HeadingLevel::H4 => out.push_str("🔖 "),
-                        _ => {}
-                    }
-                }
-                Tag::BlockQuote(_) => {
-                    prev_was_heading = false;
-                    if has_content && !out.ends_with("\n\n") {
-                        push_newline(&mut out, in_blockquote);
-                    }
-                    out.push_str("**>");
-                    has_content = true;
-                    in_blockquote = true;
-                }
-                Tag::Emphasis => {
-                    out.push('_');
-                    has_content = true;
-                }
-                Tag::Strong => {
-                    out.push('*');
-                    has_content = true;
-                }
-                Tag::Strikethrough => {
-                    out.push('~');
-                    has_content = true;
-                }
-                Tag::Link { dest_url, .. } => {
-                    link_stack.push(dest_url.to_string());
-                    out.push('[');
-                    has_content = true;
-                }
-                Tag::List(_) => {
-                    prev_was_heading = false;
-                    if has_content {
-                        if in_blockquote {
-                            if !out.ends_with('\n') && !out.ends_with('>') {
-                                push_newline(&mut out, in_blockquote);
-                            }
-                        } else {
-                            push_newline(&mut out, in_blockquote);
-                        }
-                    }
-                }
-                Tag::Item => {
-                    prev_was_heading = false;
-                    if has_content && !out.ends_with('\n') && !(in_blockquote && out.ends_with('>'))
-                    {
-                        push_newline(&mut out, in_blockquote);
-                    }
-                    out.push('⦁');
-                    out.push(' ');
-                    has_content = true;
-                    in_list_item = true;
-                }
-                Tag::CodeBlock(kind) => {
-                    prev_was_heading = false;
-                    if has_content {
-                        push_newline(&mut out, in_blockquote);
-                    }
-                    out.push_str("```");
-                    has_content = true;
-                    if let CodeBlockKind::Fenced(lang) = kind {
-                        if !lang.is_empty() {
-                            out.push_str(lang.as_ref());
-                        }
+            Event::Start(tag) => {
+                let mut gap_inserted = false;
+                if blockquote_pending_gap {
+                    if !out.ends_with('\n') {
+                        out.push('\n');
                     }
                     out.push('\n');
-                    in_code_block = true;
+                    blockquote_pending_gap = false;
+                    gap_inserted = true;
                 }
-                _ => {}
-            },
+                match tag {
+                    Tag::Paragraph => {
+                        prev_was_heading = false;
+                        if has_content
+                            && !gap_inserted
+                            && !in_list_item
+                            && !(in_blockquote && blockquote_paragraphs == 0)
+                        {
+                            push_newline(&mut out, in_blockquote);
+                        }
+                        if in_blockquote {
+                            blockquote_paragraphs += 1;
+                        }
+                    }
+                    Tag::Heading { level, .. } => {
+                        if has_content && !gap_inserted {
+                            if prev_was_heading {
+                                if !out.ends_with('\n') {
+                                    push_newline(&mut out, in_blockquote);
+                                }
+                            } else if !out.ends_with("\n\n") {
+                                push_newline(&mut out, in_blockquote);
+                            }
+                        }
+                        out.push('*');
+                        has_content = true;
+                        prev_was_heading = true;
+                        match level {
+                            HeadingLevel::H1 => out.push_str("📌 "),
+                            HeadingLevel::H2 => out.push_str("✏ "),
+                            HeadingLevel::H3 => out.push_str("📚 "),
+                            HeadingLevel::H4 => out.push_str("🔖 "),
+                            _ => {}
+                        }
+                    }
+                    Tag::BlockQuote(_) => {
+                        prev_was_heading = false;
+                        if has_content && !out.ends_with("\n\n") {
+                            push_newline(&mut out, in_blockquote);
+                        }
+                        blockquote_start = Some(out.len());
+                        blockquote_paragraphs = 0;
+                        out.push('>');
+                        in_blockquote = true;
+                    }
+                    Tag::Emphasis => {
+                        out.push('_');
+                        has_content = true;
+                    }
+                    Tag::Strong => {
+                        out.push('*');
+                        has_content = true;
+                    }
+                    Tag::Strikethrough => {
+                        out.push('~');
+                        has_content = true;
+                    }
+                    Tag::Link { dest_url, .. } => {
+                        link_stack.push(dest_url.to_string());
+                        out.push('[');
+                        has_content = true;
+                    }
+                    Tag::List(_) => {
+                        prev_was_heading = false;
+                        if has_content && !gap_inserted {
+                            if in_blockquote {
+                                if !out.ends_with('\n') && !out.ends_with('>') {
+                                    push_newline(&mut out, in_blockquote);
+                                }
+                            } else {
+                                push_newline(&mut out, in_blockquote);
+                            }
+                        }
+                    }
+                    Tag::Item => {
+                        prev_was_heading = false;
+                        if has_content
+                            && !gap_inserted
+                            && !out.ends_with('\n')
+                            && !(in_blockquote && out.ends_with('>'))
+                        {
+                            push_newline(&mut out, in_blockquote);
+                        }
+                        out.push('⦁');
+                        out.push(' ');
+                        has_content = true;
+                        in_list_item = true;
+                    }
+                    Tag::CodeBlock(kind) => {
+                        prev_was_heading = false;
+                        if has_content && !gap_inserted {
+                            push_newline(&mut out, in_blockquote);
+                        }
+                        out.push_str("```");
+                        has_content = true;
+                        if let CodeBlockKind::Fenced(lang) = kind {
+                            if !lang.is_empty() {
+                                out.push_str(lang.as_ref());
+                            }
+                        }
+                        out.push('\n');
+                        in_code_block = true;
+                    }
+                    _ => {}
+                }
+            }
             Event::End(tag) => match tag {
                 TagEnd::Paragraph => {
                     if !in_list_item {
@@ -175,16 +200,19 @@ fn render_markdown(input: &str) -> String {
                     in_code_block = false;
                 }
                 TagEnd::BlockQuote(_) => {
-                    // If we ended up with a dangling quote marker for the next line,
-                    // drop it so the blockquote closes cleanly.
-                    if out.ends_with('>') {
+                    if out.ends_with("\n>") {
+                        out.truncate(out.len() - 2);
+                    } else if out.ends_with('>') {
                         out.pop();
-                        if out.ends_with('\n') {
-                            out.pop();
+                    }
+                    if let Some(start) = blockquote_start.take() {
+                        if blockquote_paragraphs > 1 {
+                            out.insert_str(start, "**");
+                            out.push_str("||");
                         }
                     }
-                    out.push_str("||");
                     in_blockquote = false;
+                    blockquote_pending_gap = true;
                 }
                 _ => {}
             },
@@ -211,7 +239,12 @@ fn render_markdown(input: &str) -> String {
                     push_newline(&mut out, in_blockquote);
                     out.push_str("  ");
                 } else {
-                    push_newline(&mut out, in_blockquote);
+                    if in_blockquote {
+                        out.push_str("  ");
+                        push_newline(&mut out, in_blockquote);
+                    } else {
+                        push_newline(&mut out, in_blockquote);
+                    }
                 }
             }
             Event::Rule => {
