@@ -95,4 +95,10 @@ fn test14() {
     transform_expect_n("12345 12345", "12345 12345", 11);
 }
 #[test]
-fn test15() {}
+fn test15() {
+    transform_expect_n(
+        "```pseudo\n1234567890\n1234567890\n```",
+        "```pseudo\n1234567890\n```===```pseudo\n1234567890\n```",
+        24,
+    );
+}
