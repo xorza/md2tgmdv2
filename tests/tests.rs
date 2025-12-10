@@ -253,6 +253,13 @@ fn preserve_newlines() {
 }
 
 #[test]
+fn asd() {
+    let input = "> - Any explicit\n>\n> **text**\n> - greetings";
+    let expected = ">⦁ Any explicit\n>\n>*text*\n>⦁ greetings";
+    transform_expect_1(input, expected);
+}
+
+#[test]
 fn test1() {
     let input = include_str!("1-input.md");
     let chunks = transform(input, TELEGRAM_BOT_MAX_MESSAGE_LENGTH);

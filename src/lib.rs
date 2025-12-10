@@ -202,6 +202,7 @@ fn render_markdown(input: &str) -> String {
 
     let mut out = String::new();
     let mut list_blank_iter = compute_list_blank_lines(input).into_iter();
+    let mut list_after_blank_iter = compute_list_after_blank_lines(input).into_iter();
     let mut link_stack: Vec<String> = Vec::new();
 
     let mut in_list_item = false;
@@ -370,7 +371,13 @@ fn render_markdown(input: &str) -> String {
                 TagEnd::Item => {
                     in_list_item = false;
                 }
-                TagEnd::List(_) => {}
+                TagEnd::List(_) => {
+                    if let Some(blank_after) = list_after_blank_iter.next() {
+                        if blank_after {
+                            push_newline(&mut out, in_blockquote);
+                        }
+                    }
+                }
                 TagEnd::CodeBlock => {
                     if !out.ends_with('\n') {
                         push_newline(&mut out, in_blockquote);
@@ -477,6 +484,57 @@ fn compute_list_blank_lines(input: &str) -> Vec<bool> {
         }
 
         prev_line_empty = trimmed.is_empty();
+    }
+
+    out
+}
+
+/// Detect whether each list in the original markdown is followed by at least
+/// one blank line before the next non-empty line. Order matches markdown order
+/// of list occurrences and ignores fenced code blocks.
+fn compute_list_after_blank_lines(input: &str) -> Vec<bool> {
+    let mut out = Vec::new();
+    let mut in_code_block = false;
+    let mut in_list = false;
+
+    for line in input.lines() {
+        let trimmed = line.trim_start();
+
+        if trimmed.starts_with("```") {
+            in_code_block = !in_code_block;
+            if in_list {
+                out.push(false);
+                in_list = false;
+            }
+            continue;
+        }
+
+        if in_code_block {
+            continue;
+        }
+
+        let is_list_item = is_list_item_line(trimmed);
+
+        if is_list_item {
+            in_list = true;
+            continue;
+        }
+
+        if in_list {
+            // Current line is not part of the list, so the list just ended.
+            out.push(trimmed.is_empty());
+            in_list = false;
+
+            // If this line is blank, keep scanning until a non-blank line so
+            // we don't treat successive blank lines as separate list endings.
+            if trimmed.is_empty() {
+                continue;
+            }
+        }
+    }
+
+    if in_list {
+        out.push(false);
     }
 
     out
