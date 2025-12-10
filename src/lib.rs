@@ -468,7 +468,8 @@ fn render_markdown(input: &str) -> String {
                 out.push('`');
                 has_content = true;
             }
-            Event::Html(t) => {
+            Event::Html(t) | Event::InlineHtml(t) => {
+                // Preserve HTML-like placeholders but escape Telegram specials.
                 out.push_str(&escape_text(&t));
                 has_content = true;
             }

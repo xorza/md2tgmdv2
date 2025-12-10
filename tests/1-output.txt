@@ -288,7 +288,7 @@ Now you have a global textual summary\. Turn it into a small, structured memory 
 >Now produce the long‑term memory from the following summary:
 >
 >\[BEGIN HIGH‑LEVEL SUMMARY\]  
->  
+><insert your final global summary\>  
 >\[END HIGH‑LEVEL SUMMARY\]
 
 The model’s output is your `long\_term\_memory` string: a compressed representation of the entire conversation that you can re‑inject into future prompts\.
@@ -388,10 +388,10 @@ You merge `segment\_summary` into existing `long\_term\_memory` with another LLM
 >You maintain a long‑term memory for a user–assistant conversation\.
 >
 >CURRENT\_MEMORY:  
->
+><insert current long\_term\_memory\>
 >
 >NEW\_INFORMATION \(summary of a recent conversation segment\):  
->
+><insert segment\_summary\>
 >
 >*TASK:*  
 >Update CURRENT\_MEMORY so that it:
@@ -459,9 +459,9 @@ You send this \(or an equivalent structured version\) as context to the LLM, ens
 
 *✏ 5\. Core Rules to Remember*
 ⦁ *Never send the full raw conversation once it’s large\.*  
-  Always send:
-⦁ A compressed long‑term memory,
-⦁ A recent window of raw messages\.===⦁ *Use the LLM in several passes:*
+  Always send:===⦁ A compressed long‑term memory,
+⦁ A recent window of raw messages\.
+⦁ *Use the LLM in several passes:*
 ⦁ Chunk‑level summarization,
 ⦁ Hierarchical compression \(if needed\),
 ⦁ Memory creation,

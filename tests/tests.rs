@@ -217,8 +217,8 @@ fn test3() {
     let chunks = transform(input, TELEGRAM_BOT_MAX_MESSAGE_LENGTH);
     let actual = chunks.join("===");
 
-    std::fs::write("tests/1-output.txt", &actual).unwrap();
+    // std::fs::write("tests/1-output.txt", &actual).unwrap();
 
-    // let expected = include_str!("1-output.txt");
-    // assert_eq!(actual, expected);
+    let expected = include_str!("1-output.txt");
+    assert_eq!(actual, expected);
 }
