@@ -76,5 +76,9 @@ fn test1() {
         29,
     );
 
-  
+    transform_expect_n(
+        "this text is 30ty chars long11\n```\n1234567890\n1234567890\n```",
+        "this text is 30ty chars long11===```\n1234567890\n1234567890\n```",
+        40,
+    );
 }
