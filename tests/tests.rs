@@ -16,6 +16,7 @@ fn transform_expect_n(input: &str, expected: &str, max_chunk_length: usize) {
 
 #[test]
 fn test1() {
+    transform_expect_1("hi\nhello", "hi\nhello");
     transform_expect_1("- **Split** it into", "⦁ *Split* it into");
     transform_expect_1(
         "Optionally (hierarchical);",
@@ -83,3 +84,14 @@ fn test1() {
         40,
     );
 }
+// #[test]
+// fn test2() {
+//     let input = include_str!("1-input.md");
+//     let expected = include_str!("1-output.txt");
+//     let chunks = transform(input, TELEGRAM_BOT_MAX_MESSAGE_LENGTH);
+//     let actual = chunks.join("===");
+
+//     std::fs::write("tests/1-output.txt", &actual).unwrap();
+
+//     assert_eq!(actual, expected);
+// }
