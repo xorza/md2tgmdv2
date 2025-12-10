@@ -152,21 +152,35 @@ fn split_simple_fenced_code(rendered: &str, max_len: usize) -> Option<Vec<String
 }
 
 fn word_wrap_chunks(rendered: &str, max_len: usize) -> Vec<String> {
+    // Preserve newlines while chunking: we split on newline boundaries first,
+    // keeping the '\n' with each segment so the original structure remains.
     let mut chunks = Vec::new();
     let mut current = String::new();
 
-    for word in rendered.split_whitespace() {
-        let extra = if current.is_empty() { 0 } else { 1 };
-        if current.len() + extra + word.len() <= max_len {
-            if extra == 1 {
-                current.push(' ');
-            }
-            current.push_str(word);
-        } else {
+    for seg in rendered.split_inclusive('\n') {
+        // If this single segment is too long, fall back to char-based splitting.
+        if seg.len() > max_len {
             if !current.is_empty() {
                 chunks.push(current);
+                current = String::new();
             }
-            current = word.to_string();
+            for piece in split_long_word(seg, max_len) {
+                chunks.push(piece);
+            }
+            continue;
+        }
+
+        let projected = if current.is_empty() {
+            seg.len()
+        } else {
+            current.len() + seg.len()
+        };
+
+        if projected <= max_len {
+            current.push_str(seg);
+        } else {
+            chunks.push(current);
+            current = seg.to_string();
         }
     }
 
@@ -382,7 +396,7 @@ fn render_markdown(input: &str) -> String {
                 out.push('`');
                 has_content = true;
             }
-            Event::SoftBreak => out.push(' '),
+            Event::SoftBreak => push_newline(&mut out, in_blockquote),
             Event::HardBreak => {
                 if in_list_item {
                     out.push_str("  ");
