@@ -47,3 +47,19 @@ fn transforms_4_fixture() {
     );
     assert_eq!(chunks[0], expected);
 }
+
+#[test]
+fn transforms_5_fixture() {
+    let input = include_str!("5-input.md").trim_end();
+    let expected = include_str!("5-output.txt").trim_end();
+
+    let chunks = transform(input, TG_MAX_LEN);
+
+    assert_eq!(
+        chunks.len(),
+        1,
+        "expected a single output chunk, got {:?}",
+        chunks
+    );
+    assert_eq!(chunks[0], expected);
+}
