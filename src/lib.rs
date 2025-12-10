@@ -468,6 +468,10 @@ fn render_markdown(input: &str) -> String {
                 out.push('`');
                 has_content = true;
             }
+            Event::Html(t) => {
+                out.push_str(&escape_text(&t));
+                has_content = true;
+            }
             Event::SoftBreak => push_newline(&mut out, in_blockquote),
             Event::HardBreak => {
                 if in_list_item {
