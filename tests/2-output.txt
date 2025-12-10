@@ -8,10 +8,12 @@
 >⦁ Key explanations, designs, solution ideas, and reasoning from the assistant \(described concisely in words; avoid large code blocks\)
 >⦁ Any decisions made, final answers given, or conclusions reached
 >⦁ Any explicit open questions or TODO items mentioned
+>
 >*EXCLUDE OR MINIMIZE:*
 >⦁ Greetings, small talk, and filler conversation
 >⦁ Repetitive text that adds no new information
 >⦁ Very low‑level intermediate steps or details unlikely to matter later
+>
 >*OUTPUT FORMAT \(plain text, no JSON, no code fences\):*
 >⦁ Topics: bullet list of the main topics discussed\.
 >⦁ User Goals: bullet list of what the user wanted or asked for in this segment\.
@@ -19,8 +21,10 @@
 >⦁ Assistant Actions: bullet list describing what the assistant did \(explained X, proposed Y, wrote code for Z, etc\.\)\.
 >⦁ Decisions / Outcomes: bullet list of any conclusions, solutions, or decisions reached\.
 >⦁ Open Questions / TODOs: bullet list of unresolved issues or future steps\.
+>
 >*LENGTH LIMIT:*
 >⦁ Maximum 300 tokens\. Be concise and information‑dense\.
+>
 >Now summarize the following conversation segment:
 >
 >\[BEGIN SEGMENT\]  

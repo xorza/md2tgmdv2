@@ -217,10 +217,8 @@ fn test1() {
     let input = include_str!("2-input.md");
     let chunks = transform(input, 99999);
     let actual = chunks.join("===");
-
-    std::fs::write("tests/2-output.txt", &actual).unwrap();
-
     let expected = include_str!("2-output.txt");
+    
     assert_eq!(actual, expected);
 }
 

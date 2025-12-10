@@ -79,12 +79,14 @@ pub fn transform(markdown: &str, max_len: usize) -> Vec<String> {
         return Vec::new();
     }
 
+    let rendered_with_markers = restore_blockquote_blank_lines(markdown, &rendered_plain);
+
     // Simplified chunking tailored to the current test expectations.
-    if rendered_plain.len() <= max_len {
-        return vec![trim_chunk(&rendered_plain)];
+    if rendered_with_markers.len() <= max_len {
+        return vec![trim_chunk(&rendered_with_markers)];
     }
 
-    let rendered = remove_empty_blockquote_lines(&rendered_plain);
+    let rendered = remove_empty_blockquote_lines(&rendered_with_markers);
 
     if let Some(chunks) = split_before_first_fence(&rendered, max_len) {
         return normalize_chunks(chunks);
@@ -248,6 +250,40 @@ fn normalize_chunks(chunks: Vec<String>) -> Vec<String> {
         out.retain(|c| !c.trim().is_empty());
     }
     out
+}
+
+fn restore_blockquote_blank_lines(original: &str, rendered: &str) -> String {
+    let rendered_lines: Vec<&str> = rendered.lines().collect();
+    let mut idx = 0;
+    let mut out = Vec::new();
+
+    for line in original.lines() {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with('>') && trimmed.trim() == ">" {
+            if let Some(r) = rendered_lines.get(idx) {
+                if r.trim() == ">" {
+                    idx += 1;
+                }
+            }
+            out.push(">".to_string());
+        } else {
+            if let Some(r) = rendered_lines.get(idx) {
+                out.push((*r).to_string());
+                idx += 1;
+            }
+        }
+    }
+
+    // Append any remaining rendered lines (e.g., renderer inserted extra blanks).
+    for r in rendered_lines.iter().skip(idx) {
+        out.push((*r).to_string());
+    }
+
+    while matches!(out.last(), Some(s) if s.trim() == ">") {
+        out.pop();
+    }
+
+    out.join("\n")
 }
 
 /// Render Markdown into Telegram-safe MarkdownV2 text.
