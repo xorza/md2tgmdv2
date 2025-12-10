@@ -9,6 +9,69 @@ use pulldown_cmark::{CodeBlockKind, Event, HeadingLevel, Options, Parser, Tag, T
 /// Telegram MarkdownV2 message hard limit.
 pub const TELEGRAM_BOT_MAX_MESSAGE_LENGTH: usize = 4096;
 
+/// Detect, in textual order, whether each list in the original markdown is
+/// preceded by a blank line. We only care about the first item of each list,
+/// and we ignore occurrences inside fenced code blocks.
+fn compute_list_blank_lines(input: &str) -> Vec<bool> {
+    let mut out = Vec::new();
+    let mut prev_line_empty = false;
+    let mut in_code_block = false;
+    let mut in_list = false;
+
+    for line in input.lines() {
+        let trimmed = line.trim_start();
+
+        if trimmed.starts_with("```") {
+            in_code_block = !in_code_block;
+            prev_line_empty = false;
+            in_list = false;
+            continue;
+        }
+
+        if in_code_block {
+            prev_line_empty = trimmed.is_empty();
+            continue;
+        }
+
+        let is_list_item = is_list_item_line(trimmed);
+
+        if is_list_item {
+            if !in_list {
+                out.push(prev_line_empty);
+                in_list = true;
+            }
+        } else if !trimmed.is_empty() {
+            in_list = false;
+        }
+
+        prev_line_empty = trimmed.is_empty();
+    }
+
+    out
+}
+
+fn is_list_item_line(trimmed: &str) -> bool {
+    if trimmed.starts_with("- ") || trimmed.starts_with("* ") || trimmed.starts_with("+ ") {
+        return true;
+    }
+
+    // Ordered list marker like "1. "
+    let mut chars = trimmed.chars().peekable();
+    let mut seen_digit = false;
+    while let Some(c) = chars.next() {
+        if c.is_ascii_digit() {
+            seen_digit = true;
+            continue;
+        }
+        if c == '.' && seen_digit && chars.peek().map_or(false, |next| *next == ' ') {
+            return true;
+        }
+        break;
+    }
+
+    false
+}
+
 /// Convert Markdown into Telegram MarkdownV2 and split into safe chunks.
 pub fn transform(markdown: &str, max_len: usize) -> Vec<String> {
     let rendered = render_markdown(markdown);
@@ -32,6 +95,7 @@ fn render_markdown(input: &str) -> String {
     let parser = Parser::new_ext(input, Options::ENABLE_STRIKETHROUGH);
 
     let mut out = String::new();
+    let mut list_blank_iter = compute_list_blank_lines(input).into_iter();
     let mut link_stack: Vec<String> = Vec::new();
     let mut in_code_block = false;
     let mut in_list_item = false;
@@ -132,14 +196,17 @@ fn render_markdown(input: &str) -> String {
                         has_content = true;
                     }
                     Tag::List(_) => {
+                        let blank_before = list_blank_iter.next().unwrap_or(false);
                         prev_was_heading = false;
                         if has_content && !gap_inserted {
                             if in_blockquote {
-                                if !out.ends_with('\n') && !out.ends_with('>') {
+                                if blank_before || (!out.ends_with('\n') && !out.ends_with('>')) {
                                     push_newline(&mut out, in_blockquote);
                                 }
                             } else {
-                                push_newline(&mut out, in_blockquote);
+                                if blank_before || !out.ends_with('\n') {
+                                    push_newline(&mut out, in_blockquote);
+                                }
                             }
                         }
                     }

@@ -54,3 +54,18 @@ fn test8() {
         "Assume:\n⦁ `MODEL\\_CONTEXT\\_TOKENS` \\= max",
     );
 }
+#[test]
+fn test9() {
+    transform_expect_1(
+        "```text\ntoken_count(text)\n```",
+        "```text\ntoken\\_count\\(text\\)\n```",
+    );
+}
+#[test]
+fn test10() {
+    transform_expect_1("> You.\n>  ", ">You\\.");
+}
+#[test]
+fn test11() {
+    transform_expect_1("> You\n> \n> Hi", ">You\n>\n>Hi");
+}
