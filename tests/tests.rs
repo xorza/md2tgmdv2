@@ -185,6 +185,15 @@ fn splits_mixed_text_and_code_block() {
 }
 
 #[test]
+fn removes_empty_lines() {
+    transform_expect_n(
+        "> 1234567890\n> \n> 1234567890",
+        ">1234567890===>1234567890",
+        14,
+    );
+}
+
+#[test]
 fn test3() {
     let input = include_str!("1-input.md");
     let chunks = transform(input, TELEGRAM_BOT_MAX_MESSAGE_LENGTH);
