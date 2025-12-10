@@ -35,5 +35,15 @@ fn test5() {
 }
 #[test]
 fn test6() {
-    transform_expect_1("## 1. What", "*✏ 1\\. What*");
+    transform_expect_1(
+        "`messages = [{role: \"user\"|\"assistant\", content: string}, …]`",
+        "`messages \\= \\[\\{role: \"user\"\\|\"assistant\", content: string\\}, …\\]`",
+    );
+}
+#[test]
+fn test7() {
+    transform_expect_1(
+        "Assume:\n- `MODEL_CONTEXT_TOKENS` = max",
+        "Assume:\n⦁ `MODEL\\_CONTEXT\\_TOKENS` \\= max",
+    );
 }
