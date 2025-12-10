@@ -82,11 +82,23 @@ fn transforms_6_fixture() {
 
 #[test]
 fn transforms_7_fixture() {
+    const MAX_LEN: usize = 281;
+
     let input = include_str!("7-input.md").trim_end();
     let expected = include_str!("7-output.txt").trim_end();
 
-    let chunks = transform(input, 281);
+    let chunks = transform(input, MAX_LEN);
     let actual = chunks.join("\n=========\n");
+
+    for (i, chunk) in chunks.iter().enumerate() {
+        assert!(
+            chunk.len() <= MAX_LEN,
+            "chunk {} exceeds limit: {} bytes (limit {})",
+            i,
+            chunk.len(),
+            MAX_LEN
+        );
+    }
 
     assert_eq!(
         chunks.len(),
