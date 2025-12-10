@@ -110,20 +110,31 @@ fn transforms_7_fixture() {
     assert_eq!(actual, expected);
 }
 
-// #[test]
-// fn transforms_1_fixture() {
-//     let input = include_str!("1-input.md").trim_end();
-//     let expected = include_str!("1-output.txt").trim_end();
+#[test]
+fn transforms_1_fixture() {
+    const MAX_LEN: usize = 4090;
 
-//     let chunks = transform(input, 4090);
-//     let actual = chunks.join("\n=========\n");
+    let input = include_str!("1-input.md").trim_end();
+    let expected = include_str!("1-output.txt").trim_end();
 
-//     assert_eq!(
-//         chunks.len(),
-//         2,
-//         "expected {} output chunks, got {:?}",
-//         chunks.len(),
-//         chunks
-//     );
-//     assert_eq!(actual, expected);
-// }
+    let chunks = transform(input, MAX_LEN);
+    let actual = chunks.join("\n=========\n");
+
+    for (i, chunk) in chunks.iter().enumerate() {
+        assert!(
+            chunk.len() <= MAX_LEN,
+            "chunk {} exceeds limit: {} bytes (limit {})",
+            i,
+            chunk.len(),
+            MAX_LEN
+        );
+    }
+    assert_eq!(
+        chunks.len(),
+        2,
+        "expected {} output chunks, got {:?}",
+        chunks.len(),
+        chunks
+    );
+    assert_eq!(actual, expected);
+}
