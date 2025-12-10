@@ -22,7 +22,7 @@ pub fn transform(markdown: &str, max_len: usize) -> anyhow::Result<Vec<String>> 
                 end_tag(tag);
             }
             Event::Text(txt) => {
-                // println!("{}", txt);
+                println!("{}", txt);
             }
             _ => return Err(anyhow::anyhow!("Unsupported event type")),
         }
@@ -42,7 +42,16 @@ fn start_tag(tag: Tag) {
             classes,
             attrs,
         } => {
-            // Handle heading events here
+            println!("Heading {}", level);
+        }
+        Tag::BlockQuote(kind) => {
+            println!("Block Quote");
+        }
+        Tag::CodeBlock(kind) => {
+            println!("Code Block");
+        }
+        Tag::HtmlBlock => {
+            println!("HTML Block");
         }
         _ => {}
     }
@@ -51,7 +60,7 @@ fn start_tag(tag: Tag) {
 fn end_tag(tag: TagEnd) {
     match tag {
         TagEnd::Paragraph => {
-            println!("Paragraph");
+            println!("Paragraph End");
         }
         TagEnd::Heading(level) => {
             // Handle heading events here
@@ -61,13 +70,10 @@ fn end_tag(tag: TagEnd) {
 }
 
 #[test]
-fn test1() {
+fn test() {
     let text = include_str!("../tests/1-input.md");
     let _ = transform(text, TELEGRAM_BOT_MAX_MESSAGE_LENGTH);
-}
 
-#[test]
-fn test3() {
     let text = include_str!("../tests/3-input.md");
     let _ = transform(text, TELEGRAM_BOT_MAX_MESSAGE_LENGTH);
 }
