@@ -24,7 +24,36 @@ pub fn transform(markdown: &str, max_len: usize) -> anyhow::Result<Vec<String>> 
             Event::Text(txt) => {
                 println!("{}", txt);
             }
-            _ => return Err(anyhow::anyhow!("Unsupported event type")),
+            Event::Code(txt) => {
+                println!("{}", txt);
+            }
+            Event::InlineMath(txt) => {
+                println!("{}", txt);
+            }
+            Event::DisplayMath(txt) => {
+                println!("{}", txt);
+            }
+            Event::Html(txt) => {
+                println!("{}", txt);
+            }
+            Event::InlineHtml(txt) => {
+                println!("{}", txt);
+            }
+            Event::FootnoteReference(txt) => {
+                println!("{}", txt);
+            }
+            Event::SoftBreak => {
+                println!("SoftBreak");
+            }
+            Event::HardBreak => {
+                println!("HardBreak");
+            }
+            Event::Rule => {
+                println!("Rule");
+            }
+            Event::TaskListMarker(b) => {
+                println!("TaskListMarker({})", b);
+            }
         }
     }
 
@@ -33,39 +62,57 @@ pub fn transform(markdown: &str, max_len: usize) -> anyhow::Result<Vec<String>> 
 
 fn start_tag(tag: Tag) {
     match tag {
-        Tag::Paragraph => {
-            println!("Paragraph");
-        }
-        Tag::Heading {
-            level,
-            id,
-            classes,
-            attrs,
-        } => {
-            println!("Heading {}", level);
-        }
-        Tag::BlockQuote(kind) => {
-            println!("Block Quote");
-        }
-        Tag::CodeBlock(kind) => {
-            println!("Code Block");
-        }
-        Tag::HtmlBlock => {
-            println!("HTML Block");
-        }
-        _ => {}
+        Tag::Paragraph => {}
+        Tag::Heading { level, .. } => {}
+        Tag::BlockQuote(kind) => {}
+        Tag::CodeBlock(_) => {}
+        Tag::HtmlBlock => {}
+        Tag::List(number) => {}
+        Tag::Item => {}
+        Tag::FootnoteDefinition(_) => {}
+        Tag::Table(_) => {}
+        Tag::TableHead => {}
+        Tag::TableRow => {}
+        Tag::TableCell => {}
+        Tag::Subscript => {}
+        Tag::Superscript => {}
+        Tag::Emphasis => {}
+        Tag::Strong => {}
+        Tag::Strikethrough => {}
+        Tag::Link { .. } => {}
+        Tag::Image { .. } => {}
+        Tag::MetadataBlock(kind) => {}
+        Tag::DefinitionList => {}
+        Tag::DefinitionListTitle => {}
+        Tag::DefinitionListDefinition => {}
     }
 }
 
 fn end_tag(tag: TagEnd) {
     match tag {
-        TagEnd::Paragraph => {
-            println!("Paragraph End");
-        }
-        TagEnd::Heading(level) => {
-            // Handle heading events here
-        }
-        _ => {}
+        TagEnd::Paragraph => {}
+        TagEnd::Heading(level) => {}
+        TagEnd::BlockQuote(kind) => {}
+        TagEnd::CodeBlock => {}
+        TagEnd::HtmlBlock => {}
+        TagEnd::List(number) => {}
+        TagEnd::Item => {}
+        TagEnd::FootnoteDefinition => {}
+        TagEnd::Table => {}
+        TagEnd::TableHead => {}
+        TagEnd::TableRow => {}
+        TagEnd::TableCell => {}
+        TagEnd::Subscript => {}
+        TagEnd::Superscript => {}
+        TagEnd::Emphasis => {}
+        TagEnd::Strong => {}
+        TagEnd::Strikethrough => {}
+        TagEnd::Link { .. } => {}
+        TagEnd::Image { .. } => {}
+        TagEnd::MetadataBlock(kind) => {}
+        TagEnd::DefinitionList => {}
+        TagEnd::DefinitionListTitle => {}
+        TagEnd::DefinitionListDefinition => {}
     }
 }
 
