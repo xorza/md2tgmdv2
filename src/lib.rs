@@ -70,10 +70,12 @@ fn end_tag(tag: TagEnd) {
 }
 
 #[test]
-fn test() {
+fn test() -> anyhow::Result<()> {
     let text = include_str!("../tests/1-input.md");
-    let _ = transform(text, TELEGRAM_BOT_MAX_MESSAGE_LENGTH);
+    let _ = transform(text, TELEGRAM_BOT_MAX_MESSAGE_LENGTH)?;
 
     let text = include_str!("../tests/3-input.md");
-    let _ = transform(text, TELEGRAM_BOT_MAX_MESSAGE_LENGTH);
+    let _ = transform(text, TELEGRAM_BOT_MAX_MESSAGE_LENGTH)?;
+
+    Ok(())
 }
