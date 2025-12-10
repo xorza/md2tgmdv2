@@ -287,6 +287,7 @@ fn render_markdown(input: &str) -> String {
     let mut in_blockquote = false;
     let mut has_content = false;
     let mut prev_was_heading = false;
+    let mut prev_was_rule = false;
     let mut blockquote_pending_gap = false;
 
     // Preserve leading blank lines (pulldown_cmark skips them).
@@ -319,9 +320,10 @@ fn render_markdown(input: &str) -> String {
                 match tag {
                     Tag::Paragraph => {
                         prev_was_heading = false;
-                        if has_content && !gap_inserted && !in_list_item {
+                        if has_content && !gap_inserted && !in_list_item && !prev_was_rule {
                             push_newline(&mut out, in_blockquote);
                         }
+                        prev_was_rule = false;
                     }
                     Tag::Heading { level, .. } => {
                         if has_content && !gap_inserted {
@@ -336,6 +338,7 @@ fn render_markdown(input: &str) -> String {
                         out.push('*');
                         has_content = true;
                         prev_was_heading = true;
+                        prev_was_rule = false;
                         match level {
                             HeadingLevel::H1 => out.push_str("⭐⭐ "),
                             HeadingLevel::H2 => out.push_str("⭐ "),
@@ -347,6 +350,7 @@ fn render_markdown(input: &str) -> String {
                     }
                     Tag::BlockQuote(_) => {
                         prev_was_heading = false;
+                        prev_was_rule = false;
                         if has_content && !out.ends_with("\n\n") {
                             push_newline(&mut out, in_blockquote);
                         }
@@ -356,23 +360,28 @@ fn render_markdown(input: &str) -> String {
                     Tag::Emphasis => {
                         out.push('_');
                         has_content = true;
+                        prev_was_rule = false;
                     }
                     Tag::Strong => {
                         out.push('*');
                         has_content = true;
+                        prev_was_rule = false;
                     }
                     Tag::Strikethrough => {
                         out.push('~');
                         has_content = true;
+                        prev_was_rule = false;
                     }
                     Tag::Link { dest_url, .. } => {
                         link_stack.push(dest_url.to_string());
                         out.push('[');
                         has_content = true;
+                        prev_was_rule = false;
                     }
                     Tag::List(_) => {
                         let blank_before = list_blank_iter.next().unwrap_or(false);
                         prev_was_heading = false;
+                        prev_was_rule = false;
                         if has_content && !gap_inserted {
                             if in_blockquote {
                                 if blank_before || (!out.ends_with('\n') && !out.ends_with('>')) {
@@ -387,6 +396,7 @@ fn render_markdown(input: &str) -> String {
                     }
                     Tag::Item => {
                         prev_was_heading = false;
+                        prev_was_rule = false;
                         if has_content
                             && !gap_inserted
                             && !out.ends_with('\n')
@@ -401,6 +411,7 @@ fn render_markdown(input: &str) -> String {
                     }
                     Tag::CodeBlock(kind) => {
                         prev_was_heading = false;
+                        prev_was_rule = false;
                         if has_content && !gap_inserted {
                             push_newline(&mut out, in_blockquote);
                         }
@@ -422,10 +433,12 @@ fn render_markdown(input: &str) -> String {
                     if !in_list_item {
                         push_newline(&mut out, in_blockquote);
                     }
+                    prev_was_rule = false;
                 }
                 TagEnd::Heading(_) => {
                     out.push('*');
                     push_newline(&mut out, in_blockquote);
+                    prev_was_rule = false;
                 }
                 TagEnd::Emphasis => out.push('_'),
                 TagEnd::Strong => out.push('*'),
@@ -449,6 +462,7 @@ fn render_markdown(input: &str) -> String {
                     out.push_str("```");
                     push_newline(&mut out, in_blockquote);
                     in_code_block = false;
+                    prev_was_rule = false;
                 }
                 TagEnd::BlockQuote(_) => {
                     if out.ends_with("\n>") {
@@ -470,17 +484,20 @@ fn render_markdown(input: &str) -> String {
                 if !t.is_empty() {
                     has_content = true;
                 }
+                prev_was_rule = false;
             }
             Event::Code(t) => {
                 out.push('`');
                 out.push_str(&escape_text(&t));
                 out.push('`');
                 has_content = true;
+                prev_was_rule = false;
             }
             Event::Html(t) | Event::InlineHtml(t) => {
                 // Preserve HTML-like placeholders but escape Telegram specials.
                 out.push_str(&escape_text(&t));
                 has_content = true;
+                prev_was_rule = false;
             }
             Event::SoftBreak => push_newline(&mut out, in_blockquote),
             Event::HardBreak => {
@@ -504,6 +521,8 @@ fn render_markdown(input: &str) -> String {
                     out.push_str("\n\n————————\n\n");
                 }
                 has_content = true;
+                prev_was_heading = false;
+                prev_was_rule = true;
             }
             _ => {}
         }

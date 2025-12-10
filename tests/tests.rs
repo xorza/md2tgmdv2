@@ -252,7 +252,7 @@ fn test1() {
     let actual = chunks.join("===");
     let expected = include_str!("2-output.txt");
 
-    // std::fs::write("tests/2-output.txt", &actual).unwrap();
+    //std::fs::write("tests/2-output.txt", &actual).unwrap();
     assert_eq!(actual, expected);
 }
 
@@ -263,6 +263,6 @@ fn test3() {
     let actual = chunks.join("===");
     let expected = include_str!("1-output.txt");
 
-    // std::fs::write("tests/1-output.txt", &actual).unwrap();
+    //std::fs::write("tests/1-output.txt", &actual).unwrap();
     assert_eq!(actual, expected);
 }

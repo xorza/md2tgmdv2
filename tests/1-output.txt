@@ -478,7 +478,6 @@ You send this \(or an equivalent structured version\) as context to the LLM, ens
 
 ————————
 
-
 If you tell me:
 ⦁ Which model you’re actually using \(and its context length\),
 ⦁ What language you’re coding in,
