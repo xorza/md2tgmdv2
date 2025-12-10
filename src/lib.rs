@@ -1,92 +1,27 @@
 //! md2tgmdv2 — Markdown → Telegram MarkdownV2 renderer.
 //!
-//! The public entry point is [`transform`]: feed it any Markdown string
-//! and it returns one or more message-ready chunks (Telegram hard‑limit is 4096
-//! chars, so we split conservatively by lines).
+//! Public entry point is [`transform`]. It renders Markdown into Telegram‑safe
+//! MarkdownV2 and splits the result into chunks that fit the provided limit.
 
 use pulldown_cmark::{CodeBlockKind, Event, HeadingLevel, Options, Parser, Tag, TagEnd};
 
 /// Telegram MarkdownV2 message hard limit.
 pub const TELEGRAM_BOT_MAX_MESSAGE_LENGTH: usize = 4096;
 
-/// Detect, in textual order, whether each list in the original markdown is
-/// preceded by a blank line. We only care about the first item of each list,
-/// and we ignore occurrences inside fenced code blocks.
-fn compute_list_blank_lines(input: &str) -> Vec<bool> {
-    let mut out = Vec::new();
-    let mut prev_line_empty = false;
-    let mut in_code_block = false;
-    let mut in_list = false;
-
-    for line in input.lines() {
-        let trimmed = line.trim_start();
-
-        if trimmed.starts_with("```") {
-            in_code_block = !in_code_block;
-            prev_line_empty = false;
-            in_list = false;
-            continue;
-        }
-
-        if in_code_block {
-            prev_line_empty = trimmed.is_empty();
-            continue;
-        }
-
-        let is_list_item = is_list_item_line(trimmed);
-
-        if is_list_item {
-            if !in_list {
-                out.push(prev_line_empty);
-                in_list = true;
-            }
-        } else if !trimmed.is_empty() {
-            in_list = false;
-        }
-
-        prev_line_empty = trimmed.is_empty();
-    }
-
-    out
-}
-
-fn is_list_item_line(trimmed: &str) -> bool {
-    if trimmed.starts_with("- ") || trimmed.starts_with("* ") || trimmed.starts_with("+ ") {
-        return true;
-    }
-
-    // Ordered list marker like "1. "
-    let mut chars = trimmed.chars().peekable();
-    let mut seen_digit = false;
-    while let Some(c) = chars.next() {
-        if c.is_ascii_digit() {
-            seen_digit = true;
-            continue;
-        }
-        if c == '.' && seen_digit && chars.peek().map_or(false, |next| *next == ' ') {
-            return true;
-        }
-        break;
-    }
-
-    false
-}
+// ---------- High level API ----------
 
 /// Convert Markdown into Telegram MarkdownV2 and split into safe chunks.
 pub fn transform(markdown: &str, max_len: usize) -> Vec<String> {
-    let rendered_plain = render_markdown(markdown);
-    if rendered_plain.is_empty() {
+    let rendered = render_markdown(markdown);
+    if rendered.is_empty() {
         return Vec::new();
     }
 
-    let rendered_with_markers = restore_blockquote_blank_lines(markdown, &rendered_plain);
+    let rendered = restore_blockquote_blank_lines(markdown, &rendered);
 
-    // Simplified chunking tailored to the current test expectations.
-    if rendered_with_markers.len() <= max_len {
-        return vec![trim_chunk(&rendered_with_markers)];
+    if rendered.len() <= max_len {
+        return vec![trim_chunk(&rendered)];
     }
-
-    let rendered = rendered_with_markers.clone();
 
     if let Some(chunks) = split_before_first_fence(&rendered, max_len) {
         return normalize_chunks(chunks);
@@ -98,6 +33,8 @@ pub fn transform(markdown: &str, max_len: usize) -> Vec<String> {
 
     normalize_chunks(word_wrap_chunks(&rendered, max_len))
 }
+
+// ---------- Chunking ----------
 
 fn split_before_first_fence(rendered: &str, max_len: usize) -> Option<Vec<String>> {
     let fence_pos = rendered.find("```")?;
@@ -128,6 +65,10 @@ fn split_before_first_fence(rendered: &str, max_len: usize) -> Option<Vec<String
 }
 
 fn split_simple_fenced_code(rendered: &str, max_len: usize) -> Option<Vec<String>> {
+    const FENCE_START: &str = "```\n";
+    const FENCE_END: &str = "\n```";
+    let fence_overhead = FENCE_START.len() + FENCE_END.len();
+
     let lines: Vec<&str> = rendered.lines().collect();
     if lines.len() < 2 || !lines.first()?.starts_with("```") || !lines.last()?.starts_with("```") {
         return None;
@@ -139,15 +80,14 @@ fn split_simple_fenced_code(rendered: &str, max_len: usize) -> Option<Vec<String
     }
 
     let mut chunks = Vec::new();
-    let fence_overhead = 8; // "```\n" + "\n```"
     let available = max_len.saturating_sub(fence_overhead).max(1);
 
     for line in body {
         if line.len() + fence_overhead <= max_len {
-            chunks.push(format!("```\n{}\n```", line));
+            chunks.push(format!("{}{}{}", FENCE_START, line, FENCE_END));
         } else {
             for piece in split_long_word(line, available) {
-                chunks.push(format!("```\n{}\n```", piece));
+                chunks.push(format!("{}{}{}", FENCE_START, piece, FENCE_END));
             }
         }
     }
@@ -156,69 +96,79 @@ fn split_simple_fenced_code(rendered: &str, max_len: usize) -> Option<Vec<String
 }
 
 fn word_wrap_chunks(rendered: &str, max_len: usize) -> Vec<String> {
-    // If there are newlines, respect them by splitting on newline boundaries.
     if rendered.contains('\n') {
-        let mut chunks = Vec::new();
-        let mut current = String::new();
-
-        for seg in rendered.split_inclusive('\n') {
-            if seg.len() > max_len {
-                if !current.is_empty() {
-                    chunks.push(current);
-                    current = String::new();
-                }
-                for piece in split_long_word(seg, max_len) {
-                    chunks.push(piece);
-                }
-                continue;
-            }
-
-            let projected = current.len() + seg.len();
-            if projected <= max_len {
-                current.push_str(seg);
-            } else {
-                if !current.is_empty() {
-                    chunks.push(current);
-                }
-                current = seg.to_string();
-            }
-        }
-
-        if !current.is_empty() {
-            chunks.push(current);
-        }
-
-        return if chunks.is_empty() {
-            vec![rendered.to_string()]
-        } else {
-            chunks
-        };
+        return wrap_by_newlines(rendered, max_len);
     }
 
-    // Otherwise, split on whitespace but keep inline links `[text](url)` intact
-    // even when their display text contains spaces.
+    wrap_by_tokens(rendered, max_len, tokenize_preserving_links)
+}
+
+fn wrap_by_newlines(rendered: &str, max_len: usize) -> Vec<String> {
     let mut chunks = Vec::new();
     let mut current = String::new();
 
-    for token in tokenize_preserving_links(rendered) {
-        let extra = if current.is_empty() { 0 } else { 1 };
-        if current.len() + extra + token.len() <= max_len {
-            if extra == 1 {
-                current.push(' ');
+    for seg in rendered.split_inclusive('\n') {
+        if seg.len() > max_len {
+            if !current.is_empty() {
+                chunks.push(current);
+                current = String::new();
             }
-            current.push_str(&token);
+            for piece in split_long_word(seg, max_len) {
+                chunks.push(piece);
+            }
+            continue;
+        }
+
+        let projected = current.len() + seg.len();
+        if projected <= max_len {
+            current.push_str(seg);
         } else {
             if !current.is_empty() {
                 chunks.push(current);
             }
-            if token.len() > max_len {
-                for piece in split_long_word(&token, max_len) {
-                    chunks.push(piece);
-                }
-                current = String::new();
-            } else {
-                current = token;
+            current = seg.to_string();
+        }
+    }
+
+    if !current.is_empty() {
+        chunks.push(current);
+    }
+
+    if chunks.is_empty() {
+        vec![rendered.to_string()]
+    } else {
+        chunks
+    }
+}
+
+fn wrap_by_tokens<F>(rendered: &str, max_len: usize, tokenizer: F) -> Vec<String>
+where
+    F: Fn(&str) -> Vec<String>,
+{
+    let mut chunks = Vec::new();
+    let mut current = String::new();
+
+    for token in tokenizer(rendered) {
+        let space = if current.is_empty() { 0 } else { 1 };
+        if current.len() + space + token.len() <= max_len {
+            if space == 1 {
+                current.push(' ');
             }
+            current.push_str(&token);
+            continue;
+        }
+
+        if !current.is_empty() {
+            chunks.push(current);
+            current = String::new();
+        }
+
+        if token.len() > max_len {
+            for piece in split_long_word(&token, max_len) {
+                chunks.push(piece);
+            }
+        } else {
+            current = token;
         }
     }
 
@@ -245,44 +195,15 @@ fn normalize_chunks(chunks: Vec<String>) -> Vec<String> {
     out
 }
 
-fn restore_blockquote_blank_lines(original: &str, rendered: &str) -> String {
-    let rendered_lines: Vec<&str> = rendered.lines().collect();
-    let mut idx = 0;
-    let mut out = Vec::new();
+// ---------- Rendering ----------
 
-    for line in original.lines() {
-        let trimmed = line.trim_start();
-        if trimmed.starts_with('>') && trimmed.trim() == ">" {
-            if let Some(r) = rendered_lines.get(idx) {
-                if r.trim() == ">" {
-                    idx += 1;
-                }
-            }
-            out.push(">".to_string());
-        } else {
-            if let Some(r) = rendered_lines.get(idx) {
-                out.push((*r).to_string());
-                idx += 1;
-            }
-        }
-    }
-
-    // Append any remaining rendered lines (e.g., renderer inserted extra blanks).
-    for r in rendered_lines.iter().skip(idx) {
-        out.push((*r).to_string());
-    }
-
-    out.join("\n")
-}
-
-/// Render Markdown into Telegram-safe MarkdownV2 text.
 fn render_markdown(input: &str) -> String {
     let parser = Parser::new_ext(input, Options::ENABLE_STRIKETHROUGH);
 
     let mut out = String::new();
     let mut list_blank_iter = compute_list_blank_lines(input).into_iter();
     let mut link_stack: Vec<String> = Vec::new();
-    let mut in_code_block = false;
+
     let mut in_list_item = false;
     let mut in_blockquote = false;
     let mut has_content = false;
@@ -296,8 +217,6 @@ fn render_markdown(input: &str) -> String {
         out.push('\n');
     }
 
-    // Insert a newline, and when inside a blockquote prefix the new line
-    // with the Telegram quote marker.
     let push_newline = |out: &mut String, in_blockquote: bool| {
         out.push('\n');
         if in_blockquote {
@@ -387,10 +306,8 @@ fn render_markdown(input: &str) -> String {
                                 if blank_before || (!out.ends_with('\n') && !out.ends_with('>')) {
                                     push_newline(&mut out, in_blockquote);
                                 }
-                            } else {
-                                if blank_before || !out.ends_with('\n') {
-                                    push_newline(&mut out, in_blockquote);
-                                }
+                            } else if blank_before || !out.ends_with('\n') {
+                                push_newline(&mut out, in_blockquote);
                             }
                         }
                     }
@@ -416,14 +333,13 @@ fn render_markdown(input: &str) -> String {
                             push_newline(&mut out, in_blockquote);
                         }
                         out.push_str("```");
-                        has_content = true;
                         if let CodeBlockKind::Fenced(lang) = kind {
                             if !lang.is_empty() {
                                 out.push_str(lang.as_ref());
                             }
                         }
                         out.push('\n');
-                        in_code_block = true;
+                        has_content = true;
                     }
                     _ => {}
                 }
@@ -461,7 +377,6 @@ fn render_markdown(input: &str) -> String {
                     }
                     out.push_str("```");
                     push_newline(&mut out, in_blockquote);
-                    in_code_block = false;
                     prev_was_rule = false;
                 }
                 TagEnd::BlockQuote(_) => {
@@ -476,11 +391,7 @@ fn render_markdown(input: &str) -> String {
                 _ => {}
             },
             Event::Text(t) => {
-                if in_code_block {
-                    out.push_str(&escape_text(&t));
-                } else {
-                    out.push_str(&escape_text(&t));
-                }
+                out.push_str(&escape_text(&t));
                 if !t.is_empty() {
                     has_content = true;
                 }
@@ -494,7 +405,6 @@ fn render_markdown(input: &str) -> String {
                 prev_was_rule = false;
             }
             Event::Html(t) | Event::InlineHtml(t) => {
-                // Preserve HTML-like placeholders but escape Telegram specials.
                 out.push_str(&escape_text(&t));
                 has_content = true;
                 prev_was_rule = false;
@@ -505,13 +415,11 @@ fn render_markdown(input: &str) -> String {
                     out.push_str("  ");
                     push_newline(&mut out, in_blockquote);
                     out.push_str("  ");
+                } else if in_blockquote {
+                    out.push_str("  ");
+                    push_newline(&mut out, in_blockquote);
                 } else {
-                    if in_blockquote {
-                        out.push_str("  ");
-                        push_newline(&mut out, in_blockquote);
-                    } else {
-                        push_newline(&mut out, in_blockquote);
-                    }
+                    push_newline(&mut out, in_blockquote);
                 }
             }
             Event::Rule => {
@@ -529,6 +437,70 @@ fn render_markdown(input: &str) -> String {
     }
 
     out.trim_end().to_string()
+}
+
+// ---------- Inline helpers ----------
+
+/// Detect, in textual order, whether each list in the original markdown is
+/// preceded by a blank line. We only care about the first item of each list,
+/// and we ignore occurrences inside fenced code blocks.
+fn compute_list_blank_lines(input: &str) -> Vec<bool> {
+    let mut out = Vec::new();
+    let mut prev_line_empty = false;
+    let mut in_code_block = false;
+    let mut in_list = false;
+
+    for line in input.lines() {
+        let trimmed = line.trim_start();
+
+        if trimmed.starts_with("```") {
+            in_code_block = !in_code_block;
+            prev_line_empty = false;
+            in_list = false;
+            continue;
+        }
+
+        if in_code_block {
+            prev_line_empty = trimmed.is_empty();
+            continue;
+        }
+
+        let is_list_item = is_list_item_line(trimmed);
+
+        if is_list_item {
+            if !in_list {
+                out.push(prev_line_empty);
+                in_list = true;
+            }
+        } else if !trimmed.is_empty() {
+            in_list = false;
+        }
+
+        prev_line_empty = trimmed.is_empty();
+    }
+
+    out
+}
+
+fn is_list_item_line(trimmed: &str) -> bool {
+    if trimmed.starts_with("- ") || trimmed.starts_with("* ") || trimmed.starts_with("+ ") {
+        return true;
+    }
+
+    let mut chars = trimmed.chars().peekable();
+    let mut seen_digit = false;
+    while let Some(c) = chars.next() {
+        if c.is_ascii_digit() {
+            seen_digit = true;
+            continue;
+        }
+        if c == '.' && seen_digit && chars.peek().map_or(false, |next| *next == ' ') {
+            return true;
+        }
+        break;
+    }
+
+    false
 }
 
 const SPECIALS: [char; 19] = [
@@ -558,20 +530,19 @@ fn tokenize_preserving_links(s: &str) -> Vec<String> {
     let mut i = 0;
 
     while i < len {
-        // Skip any whitespace; we only need tokens.
         if bytes[i].is_ascii_whitespace() {
             i += 1;
             continue;
         }
 
-        // Try to capture an escaped markdown link `\[...]\(...)` as a single token.
+        // Try to capture escaped markdown link `\[...](...)` as single token.
         if bytes[i] == b'\\' && i + 1 < len && bytes[i + 1] == b'[' {
             if let Some(bracket_rel) = s[i + 2..].find("\\]") {
-                let end_bracket = i + 2 + bracket_rel; // points to start of "\\]"
+                let end_bracket = i + 2 + bracket_rel; // start of "\\]"
                 let after_bracket = end_bracket + 2;
                 if after_bracket + 1 < len && s[after_bracket..].starts_with("\\(") {
                     let end = if let Some(paren_rel) = s[after_bracket + 2..].find("\\)") {
-                        let end_paren = after_bracket + 2 + paren_rel; // start of "\\)"
+                        let end_paren = after_bracket + 2 + paren_rel;
                         (end_paren + 2).min(len)
                     } else {
                         len
@@ -585,7 +556,7 @@ fn tokenize_preserving_links(s: &str) -> Vec<String> {
             }
         }
 
-        // Fallback for non-escaped forms (should be rare post-escape).
+        // Unescaped markdown link `[...](...)`
         if bytes[i] == b'[' && i + 1 < len {
             if let Some(bracket_rel) = s[i + 1..].find(']') {
                 let end_bracket = i + 1 + bracket_rel;
@@ -629,4 +600,32 @@ fn split_long_word(word: &str, max_len: usize) -> Vec<String> {
     }
 
     out
+}
+
+fn restore_blockquote_blank_lines(original: &str, rendered: &str) -> String {
+    let rendered_lines: Vec<&str> = rendered.lines().collect();
+    let mut idx = 0;
+    let mut out = Vec::new();
+
+    for line in original.lines() {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with('>') && trimmed.trim() == ">" {
+            if let Some(r) = rendered_lines.get(idx) {
+                if r.trim() == ">" {
+                    idx += 1;
+                }
+            }
+            out.push(">".to_string());
+        } else if let Some(r) = rendered_lines.get(idx) {
+            out.push((*r).to_string());
+            idx += 1;
+        }
+    }
+
+    // Append any remaining rendered lines (e.g., renderer inserted extra blanks).
+    for r in rendered_lines.iter().skip(idx) {
+        out.push((*r).to_string());
+    }
+
+    out.join("\n")
 }
