@@ -309,3 +309,14 @@ fn test3() {
     std::fs::write("tests/3-output.txt", &actual).unwrap();
     // assert_eq!(actual, expected);
 }
+
+#[test]
+fn test4() {
+    let input = include_str!("4-input.md");
+    let chunks = transform(input, TELEGRAM_BOT_MAX_MESSAGE_LENGTH);
+    let actual = chunks.join("===");
+    let expected = include_str!("4-output.txt");
+
+    // std::fs::write("tests/4-output.txt", &actual).unwrap();
+    assert_eq!(actual, expected);
+}

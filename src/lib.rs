@@ -668,9 +668,10 @@ fn restore_blockquote_blank_lines(original: &str, rendered: &str) -> String {
     for line in original.lines() {
         let trimmed = line.trim_start();
         if trimmed.starts_with('>') && trimmed.trim() == ">" {
+            // Preserve explicit blank lines inside blockquotes from the source.
             if let Some(r) = rendered_lines.get(idx) {
                 if r.trim() == ">" {
-                    idx += 1;
+                    idx += 1; // consume matching blank that renderer may have produced
                 }
             }
             out.push(">".to_string());
