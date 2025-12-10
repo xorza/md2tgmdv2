@@ -43,6 +43,13 @@ fn test6() {
 #[test]
 fn test7() {
     transform_expect_1(
+        "Assume:\n\n- `MODEL_CONTEXT_TOKENS` = max",
+        "Assume:\n\n⦁ `MODEL\\_CONTEXT\\_TOKENS` \\= max",
+    );
+}
+#[test]
+fn test8() {
+    transform_expect_1(
         "Assume:\n- `MODEL_CONTEXT_TOKENS` = max",
         "Assume:\n⦁ `MODEL\\_CONTEXT\\_TOKENS` \\= max",
     );
