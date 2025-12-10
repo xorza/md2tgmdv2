@@ -243,7 +243,11 @@ fn trim_chunk(s: &str) -> String {
 }
 
 fn normalize_chunks(chunks: Vec<String>) -> Vec<String> {
-    chunks.into_iter().map(|c| trim_chunk(&c)).collect()
+    let mut out: Vec<String> = chunks.into_iter().map(|c| trim_chunk(&c)).collect();
+    if out.len() > 1 {
+        out.retain(|c| !c.trim().is_empty());
+    }
+    out
 }
 
 /// Render Markdown into Telegram-safe MarkdownV2 text.
