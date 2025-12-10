@@ -183,12 +183,18 @@ fn splits_mixed_text_and_code_block() {
 fn removes_empty_lines_on_split_3() {
     transform_expect_n("1234567890\n\n1234567890", "1234567890===1234567890", 10);
 }
+
 #[test]
 fn preserves_empty_lines_no_split() {
     transform_expect_1(
         "> 1234567890\n> \n> 1234567890",
         ">1234567890\n>\n>1234567890",
     );
+}
+
+#[test]
+fn text_in_angle_brackets_should_not_be_removed() {
+    transform_expect_1("> <insert segment_summary>  ", "><insert segment_summary>");
 }
 
 #[test]
