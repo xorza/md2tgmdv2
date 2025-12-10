@@ -224,6 +224,13 @@ fn heading_followed_by_list_no_blank_line() {
 }
 
 #[test]
+fn url_not_split_across_chunks() {
+    let input = "1234567890123456789012345678901234567890123456789012345678901234567890 [see docs](https://example.com/path";
+    let expected = "1234567890123456789012345678901234567890123456789012345678901234567890===[see docs](https://example.com/path";
+    transform_expect_n(input, expected, 80);
+}
+
+#[test]
 fn test1() {
     let input = include_str!("2-input.md");
     let chunks = transform(input, 99999);
