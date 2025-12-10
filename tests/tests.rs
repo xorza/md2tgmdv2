@@ -66,7 +66,7 @@ fn converts_emphasis_and_italics() {
 
 #[test]
 fn converts_heading() {
-    transform_expect_1("## 1. What", "*✏ 1\\. What*");
+    transform_expect_1("## 1. What", "*⭐ 1\\. What*");
 }
 
 #[test]
@@ -198,6 +198,29 @@ fn text_in_angle_brackets_should_not_be_removed() {
         "> <insert segment_summary>  ",
         "><insert segment\\_summary\\>",
     );
+}
+
+#[test]
+fn ordered_list_items_convert() {
+    transform_expect_1("1. First\n2. Second", "⦁ First\n⦁ Second");
+}
+
+#[test]
+fn nested_blockquote_preserves_levels() {
+    transform_expect_1("> > Nested", ">>Nested");
+}
+
+#[test]
+fn inline_link_escapes_parens_in_url() {
+    transform_expect_1(
+        "[see docs](https://example.com/path(a)/page)",
+        "[see docs](https://example.com/path\\(a\\)/page)",
+    );
+}
+
+#[test]
+fn heading_followed_by_list_no_blank_line() {
+    transform_expect_1("## Heading\n- item", "*⭐ Heading*\n⦁ item");
 }
 
 #[test]
