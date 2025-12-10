@@ -18,6 +18,10 @@ fn test2() {
         "Optionally \\(hierarchical\\);",
     );
 }
+#[test]
+fn test3() {
+    transform_expect_1("the past.\n", "the past\\.");
+}
 
 // #[test]
 // fn transforms_2_fixture() {
