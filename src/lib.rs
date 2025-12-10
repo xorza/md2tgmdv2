@@ -102,8 +102,6 @@ fn render_markdown(input: &str) -> String {
     let mut in_blockquote = false;
     let mut has_content = false;
     let mut prev_was_heading = false;
-    let mut blockquote_start: Option<usize> = None;
-    let mut blockquote_paragraphs: usize = 0;
     let mut blockquote_pending_gap = false;
 
     // Preserve leading blank lines (pulldown_cmark skips them).
@@ -136,15 +134,8 @@ fn render_markdown(input: &str) -> String {
                 match tag {
                     Tag::Paragraph => {
                         prev_was_heading = false;
-                        if has_content
-                            && !gap_inserted
-                            && !in_list_item
-                            && !(in_blockquote && blockquote_paragraphs == 0)
-                        {
+                        if has_content && !gap_inserted && !in_list_item {
                             push_newline(&mut out, in_blockquote);
-                        }
-                        if in_blockquote {
-                            blockquote_paragraphs += 1;
                         }
                     }
                     Tag::Heading { level, .. } => {
@@ -173,8 +164,6 @@ fn render_markdown(input: &str) -> String {
                         if has_content && !out.ends_with("\n\n") {
                             push_newline(&mut out, in_blockquote);
                         }
-                        blockquote_start = Some(out.len());
-                        blockquote_paragraphs = 0;
                         out.push('>');
                         in_blockquote = true;
                     }
@@ -280,12 +269,6 @@ fn render_markdown(input: &str) -> String {
                         out.truncate(out.len() - 2);
                     } else if out.ends_with('>') {
                         out.pop();
-                    }
-                    if let Some(start) = blockquote_start.take() {
-                        if blockquote_paragraphs > 1 {
-                            out.insert_str(start, "**");
-                            out.push_str("||");
-                        }
                     }
                     in_blockquote = false;
                     blockquote_pending_gap = true;
