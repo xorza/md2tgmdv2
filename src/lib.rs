@@ -7,7 +7,7 @@
 use pulldown_cmark::{CodeBlockKind, Event, HeadingLevel, Options, Parser, Tag, TagEnd};
 
 /// Telegram MarkdownV2 message hard limit.
-pub const TG_MAX_LEN: usize = 4096;
+pub const TELEGRAM_BOT_MAX_MESSAGE_LENGTH: usize = 4096;
 
 /// Convert Markdown into Telegram MarkdownV2 and split into safe chunks.
 pub fn transform(markdown: &str, max_len: usize) -> Vec<String> {
@@ -15,7 +15,16 @@ pub fn transform(markdown: &str, max_len: usize) -> Vec<String> {
     if rendered.is_empty() {
         return Vec::new();
     }
-    split_chunks(&rendered, max_len)
+    let effective_max = if max_len > 1000 {
+        max_len.saturating_sub(170)
+    } else {
+        max_len
+    };
+    let chunks = split_chunks(&rendered, effective_max);
+    chunks
+        .into_iter()
+        .map(|chunk| strip_trailing_spaces(&chunk))
+        .collect()
 }
 
 /// Render Markdown into Telegram-safe MarkdownV2 text.
@@ -282,6 +291,31 @@ fn escape_url(s: &str) -> String {
     s.replace(')', "\\)").replace('(', "\\(")
 }
 
+/// Remove trailing spaces that appear because Markdown uses two spaces for soft line breaks.
+/// We keep code fences untouched to avoid altering literal content.
+fn strip_trailing_spaces(input: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    let mut in_code_block = false;
+
+    for line in input.lines() {
+        let trimmed_for_fence = line.trim_start_matches('>');
+        let is_fence = trimmed_for_fence.starts_with("```");
+
+        if is_fence {
+            in_code_block = !in_code_block;
+            out.push_str(line);
+        } else if in_code_block {
+            // Inside code blocks, preserve whitespace exactly.
+            out.push_str(line);
+        } else {
+            out.push_str(line.trim_end());
+        }
+        out.push('\n');
+    }
+
+    out.trim_end().to_string()
+}
+
 fn split_chunks(input: &str, max_len: usize) -> Vec<String> {
     let mut blocks: Vec<String> = Vec::new();
     let mut current = String::new();
@@ -322,8 +356,14 @@ fn split_chunks(input: &str, max_len: usize) -> Vec<String> {
         } else {
             current.len() + 1 + line.len()
         };
+        let projected_with_fence = if in_code_lang.is_some() {
+            // If we split while inside a code block, we'll need to append a closing fence.
+            projected + 4 // "```" + possible newline
+        } else {
+            projected
+        };
 
-        if projected > max_len && !current.is_empty() {
+        if projected_with_fence > max_len && !current.is_empty() {
             // Push current chunk.
             if in_code_lang.is_some() {
                 if !current.ends_with('\n') {
