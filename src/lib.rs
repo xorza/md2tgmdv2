@@ -25,12 +25,13 @@ fn render_markdown(input: &str) -> String {
     let mut out = String::new();
     let mut link_stack: Vec<String> = Vec::new();
     let mut in_code_block = false;
+    let mut in_list_item = false;
 
     for event in parser {
         match event {
             Event::Start(tag) => match tag {
                 Tag::Paragraph => {
-                    if !out.is_empty() {
+                    if !out.is_empty() && !in_list_item {
                         out.push('\n');
                     }
                 }
@@ -46,6 +47,19 @@ fn render_markdown(input: &str) -> String {
                 Tag::Link { dest_url, .. } => {
                     link_stack.push(dest_url.to_string());
                     out.push('[');
+                }
+                Tag::List(_) => {
+                    if !out.is_empty() {
+                        out.push('\n');
+                    }
+                }
+                Tag::Item => {
+                    if !out.ends_with('\n') && !out.is_empty() {
+                        out.push('\n');
+                    }
+                    out.push('⦁');
+                    out.push(' ');
+                    in_list_item = true;
                 }
                 Tag::CodeBlock(kind) => {
                     if !out.is_empty() {
@@ -63,7 +77,11 @@ fn render_markdown(input: &str) -> String {
                 _ => {}
             },
             Event::End(tag) => match tag {
-                TagEnd::Paragraph => out.push('\n'),
+                TagEnd::Paragraph => {
+                    if !in_list_item {
+                        out.push('\n');
+                    }
+                }
                 TagEnd::Heading(_) => {
                     out.push('*');
                     out.push('\n');
@@ -79,6 +97,13 @@ fn render_markdown(input: &str) -> String {
                         out.push(')');
                     }
                 }
+                TagEnd::Item => {
+                    if !out.ends_with('\n') {
+                        out.push('\n');
+                    }
+                    in_list_item = false;
+                }
+                TagEnd::List(_) => {}
                 TagEnd::CodeBlock => {
                     out.push('\n');
                     out.push_str("```");
