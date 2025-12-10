@@ -212,6 +212,18 @@ fn preserves_empty_lines_no_split() {
     );
 }
 
+#[test]
+fn test1() {
+    let input = include_str!("2-input.md");
+    let chunks = transform(input, 99999);
+    let actual = chunks.join("===");
+
+    std::fs::write("tests/2-output.txt", &actual).unwrap();
+
+    let expected = include_str!("2-output.txt");
+    assert_eq!(actual, expected);
+}
+
 // #[test]
 // fn test3() {
 //     let input = include_str!("1-input.md");
