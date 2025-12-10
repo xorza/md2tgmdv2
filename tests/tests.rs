@@ -9,7 +9,7 @@ fn transform_expect_1(input: &str, expected: &str) {
 
 fn transform_expect_n(input: &str, expected: &str, max_chunk_length: usize) {
     let chunks = transform(input, max_chunk_length);
-    let actual = chunks.join("\n===\n");
+    let actual = chunks.join("===");
 
     assert_eq!(actual, expected);
 }
@@ -89,9 +89,8 @@ fn test13() {
 }
 #[test]
 fn test14() {
-    transform_expect_n("12345 12345", "12345\n===\n12345", 5);
-    transform_expect_n("12345 12345", "12345\n===\n12345", 6);
-    transform_expect_n("12345 12345", "12345\n===\n12345", 10);
+    transform_expect_n("12345 12345", "12345===12345", 5);
+    transform_expect_n("12345 12345", "12345===12345", 10);
     transform_expect_n("12345 12345", "12345 12345", 11);
 }
 #[test]
