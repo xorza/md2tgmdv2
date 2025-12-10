@@ -218,18 +218,18 @@ fn test1() {
     let chunks = transform(input, 99999);
     let actual = chunks.join("===");
     let expected = include_str!("2-output.txt");
-    
+
     assert_eq!(actual, expected);
 }
 
-// #[test]
-// fn test3() {
-//     let input = include_str!("1-input.md");
-//     let chunks = transform(input, TELEGRAM_BOT_MAX_MESSAGE_LENGTH);
-//     let actual = chunks.join("===");
+#[test]
+fn test3() {
+    let input = include_str!("1-input.md");
+    let chunks = transform(input, TELEGRAM_BOT_MAX_MESSAGE_LENGTH);
+    let actual = chunks.join("===");
 
-//     std::fs::write("tests/1-output.txt", &actual).unwrap();
+    std::fs::write("tests/1-output.txt", &actual).unwrap();
 
-//     let expected = include_str!("1-output.txt");
-//     assert_eq!(actual, expected);
-// }
+    let expected = include_str!("1-output.txt");
+    assert_eq!(actual, expected);
+}
