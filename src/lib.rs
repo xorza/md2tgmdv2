@@ -35,11 +35,14 @@ fn render_markdown(input: &str) -> String {
                         out.push('\n');
                     }
                 }
-                Tag::Heading { .. } => {
+                Tag::Heading { level, .. } => {
                     if !out.is_empty() {
                         out.push('\n');
                     }
                     out.push('*');
+                    if let pulldown_cmark::HeadingLevel::H2 = level {
+                        out.push_str("✏ ");
+                    }
                 }
                 Tag::Emphasis => out.push('_'),
                 Tag::Strong => out.push('*'),
@@ -125,8 +128,14 @@ fn render_markdown(input: &str) -> String {
                 out.push('`');
             }
             Event::SoftBreak => out.push(' '),
-            Event::HardBreak => out.push('\n'),
-            Event::Rule => out.push_str("\n---\n"),
+            Event::HardBreak => {
+                if in_list_item {
+                    out.push_str("  \n  ");
+                } else {
+                    out.push('\n');
+                }
+            }
+            Event::Rule => out.push_str("\n————————\n"),
             _ => {}
         }
     }
