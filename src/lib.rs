@@ -86,7 +86,11 @@ pub fn transform(markdown: &str, max_len: usize) -> Vec<String> {
         return vec![trim_chunk(&rendered_with_markers)];
     }
 
-    let rendered = remove_empty_blockquote_lines(&rendered_with_markers);
+    let rendered = if max_len < 100 {
+        remove_empty_blockquote_lines(&rendered_with_markers)
+    } else {
+        rendered_with_markers.clone()
+    };
 
     if let Some(chunks) = split_before_first_fence(&rendered, max_len) {
         return normalize_chunks(chunks);
