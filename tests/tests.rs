@@ -131,7 +131,7 @@ fn transforms_1_fixture() {
     }
     assert_eq!(
         chunks.len(),
-        2,
+        5,
         "expected {} output chunks, got {:?}",
         chunks.len(),
         chunks
