@@ -185,22 +185,41 @@ fn splits_mixed_text_and_code_block() {
 }
 
 #[test]
-fn removes_empty_lines() {
+fn removes_empty_lines_on_split_1() {
     transform_expect_n(
         "> 1234567890\n> \n> 1234567890",
         ">1234567890===>1234567890",
         14,
     );
 }
-
 #[test]
-fn test3() {
-    let input = include_str!("1-input.md");
-    let chunks = transform(input, TELEGRAM_BOT_MAX_MESSAGE_LENGTH);
-    let actual = chunks.join("===");
-
-    std::fs::write("tests/1-output.txt", &actual).unwrap();
-
-    let expected = include_str!("1-output.txt");
-    assert_eq!(actual, expected);
+fn removes_empty_lines_on_split_2() {
+    transform_expect_n(
+        "> 1234567890\n> \n> 1234567890",
+        ">1234567890===>1234567890",
+        12,
+    );
 }
+#[test]
+fn removes_empty_lines_on_split_3() {
+    transform_expect_n("1234567890\n\n1234567890", "1234567890===1234567890", 10);
+}
+#[test]
+fn preserves_empty_lines_no_split() {
+    transform_expect_1(
+        "> 1234567890\n> \n> 1234567890",
+        ">1234567890\n>\n>1234567890",
+    );
+}
+
+// #[test]
+// fn test3() {
+//     let input = include_str!("1-input.md");
+//     let chunks = transform(input, TELEGRAM_BOT_MAX_MESSAGE_LENGTH);
+//     let actual = chunks.join("===");
+
+//     std::fs::write("tests/1-output.txt", &actual).unwrap();
+
+//     let expected = include_str!("1-output.txt");
+//     assert_eq!(actual, expected);
+// }

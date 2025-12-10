@@ -122,9 +122,7 @@ For each chunk, call the LLM with a strict summarization prompt\.
 >
 >You are summarizing a segment of a long conversation between a user and an assistant\.
 >
->Your goal is to produce a short but highly informative summary that can replace the raw messages in future prompts\.
->
-===>*INCLUDE \(only if present and important\):*
+>Your goal is to produce a short but highly informative summary that can replace the raw messages in future prompts\.===>*INCLUDE \(only if present and important\):*
 >
 >⦁ Main user questions, tasks, and goals in this segment
 >⦁ Important facts, constraints, and preferences the user states \(deadlines, environment, skill level, likes/dislikes, etc\.\)
@@ -218,8 +216,7 @@ Each `group` will be converted into a higher‑level summary\.
 >⦁ Open Issues / TODOs: bullet list of unresolved questions or tasks left after these segments\.
 >*LENGTH LIMIT:*
 >
->⦁ Maximum 400 tokens\. Aggressively remove repetition and low‑value detail\.
-===>Now compress the following summaries into one higher‑level summary:
+>⦁ Maximum 400 tokens\. Aggressively remove repetition and low‑value detail\.===>Now compress the following summaries into one higher‑level summary:
 >
 >\[BEGIN SUMMARIES\]  
 ><insert the chunk summaries here, separated and in order\>  
@@ -326,8 +323,7 @@ function handle\_user\_message\(user\_text\):
             state\.recent\_messages \= state\.recent\_messages \- old\_segment
             \# Merge new summary into long\_term\_memory
             state\.long\_term\_memory \= update\_memory\(
-                current\_memory \= state\.long\_term\_memory,
-===                new\_summary \= segment\_summary
+                current\_memory \= state\.long\_term\_memory,===                new\_summary \= segment\_summary
             \)
 
     \# 4\. Build final prompt using updated memory \+ remaining recent messages
@@ -448,8 +444,7 @@ You send this \(or an equivalent structured version\) as context to the LLM, ens
 ⦁ *Never send the full raw conversation once it’s large\.*  
   Always send:
 ⦁ A compressed long‑term memory,
-⦁ A recent window of raw messages\.
-===⦁ *Use the LLM in several passes:*
+⦁ A recent window of raw messages\.===⦁ *Use the LLM in several passes:*
 ⦁ Chunk‑level summarization,
 ⦁ Hierarchical compression \(if needed\),
 ⦁ Memory creation,

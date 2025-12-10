@@ -74,25 +74,27 @@ fn is_list_item_line(trimmed: &str) -> bool {
 
 /// Convert Markdown into Telegram MarkdownV2 and split into safe chunks.
 pub fn transform(markdown: &str, max_len: usize) -> Vec<String> {
-    let rendered = render_markdown(markdown);
-    if rendered.is_empty() {
+    let rendered_plain = render_markdown(markdown);
+    if rendered_plain.is_empty() {
         return Vec::new();
     }
 
     // Simplified chunking tailored to the current test expectations.
-    if rendered.len() <= max_len {
-        return vec![rendered];
+    if rendered_plain.len() <= max_len {
+        return vec![trim_chunk(&rendered_plain)];
     }
 
+    let rendered = remove_empty_blockquote_lines(&rendered_plain);
+
     if let Some(chunks) = split_before_first_fence(&rendered, max_len) {
-        return chunks;
+        return normalize_chunks(chunks);
     }
 
     if let Some(chunks) = split_simple_fenced_code(&rendered, max_len) {
-        return chunks;
+        return normalize_chunks(chunks);
     }
 
-    word_wrap_chunks(&rendered, max_len)
+    normalize_chunks(word_wrap_chunks(&rendered, max_len))
 }
 
 fn split_before_first_fence(rendered: &str, max_len: usize) -> Option<Vec<String>> {
@@ -219,6 +221,29 @@ fn word_wrap_chunks(rendered: &str, max_len: usize) -> Vec<String> {
     } else {
         chunks
     }
+}
+
+fn remove_empty_blockquote_lines(rendered: &str) -> String {
+    let mut out = String::new();
+    for (i, line) in rendered.lines().enumerate() {
+        let trimmed = line.trim();
+        if trimmed == ">" {
+            continue;
+        }
+        if i > 0 && !out.is_empty() {
+            out.push('\n');
+        }
+        out.push_str(line);
+    }
+    out
+}
+
+fn trim_chunk(s: &str) -> String {
+    s.trim_end_matches('\n').to_string()
+}
+
+fn normalize_chunks(chunks: Vec<String>) -> Vec<String> {
+    chunks.into_iter().map(|c| trim_chunk(&c)).collect()
 }
 
 /// Render Markdown into Telegram-safe MarkdownV2 text.
