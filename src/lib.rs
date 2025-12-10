@@ -283,34 +283,40 @@ fn escape_url(s: &str) -> String {
 }
 
 fn split_chunks(input: &str, max_len: usize) -> Vec<String> {
-    let mut blocks = Vec::new();
+    let mut blocks: Vec<String> = Vec::new();
     let mut current = String::new();
-    let mut last_was_empty = false;
-    let mut seen_nonempty = false;
+    let mut in_code_lang: Option<String> = None;
+    let mut continuing_code_chunk = false;
+    let mut prev_line_empty = false;
+
+    let mut push_line = |buf: &mut String, line: &str| {
+        if line.is_empty() {
+            buf.push('\n');
+            return;
+        }
+        if buf.is_empty() {
+            buf.push_str(line);
+            return;
+        }
+        let only_newlines = buf.chars().all(|c| c == '\n');
+        if only_newlines {
+            buf.push_str(line);
+        } else {
+            buf.push('\n');
+            buf.push_str(line);
+        }
+    };
 
     for line in input.lines() {
-        // Preserve empty lines (including leading ones).
-        if line.is_empty() {
-            if current.len() + 1 > max_len && !current.is_empty() {
-                blocks.push(current);
-                current = String::new();
-            }
-            current.push('\n');
-            last_was_empty = true;
-            continue;
-        }
+        let trimmed = line.trim_start();
+        let is_fence = trimmed.starts_with("```");
+        let fence_lang = if is_fence {
+            trimmed.trim_start_matches("```").to_string()
+        } else {
+            String::new()
+        };
 
-        // If a single line is longer than the limit, flush current and hard-split the line.
-        if line.len() > max_len {
-            if !current.is_empty() {
-                blocks.push(current);
-                current = String::new();
-            }
-            blocks.extend(split_long_line(line, max_len));
-            last_was_empty = false;
-            continue;
-        }
-
+        // Determine if we need to start a new chunk.
         let projected = if current.is_empty() {
             line.len()
         } else {
@@ -318,16 +324,67 @@ fn split_chunks(input: &str, max_len: usize) -> Vec<String> {
         };
 
         if projected > max_len && !current.is_empty() {
+            // Push current chunk.
+            if in_code_lang.is_some() {
+                if !current.ends_with('\n') {
+                    current.push('\n');
+                }
+                current.push_str("```");
+            }
             blocks.push(current);
             current = String::new();
+
+            // If we are splitting in the middle of a code block, seed the next chunk with the opening fence.
+            if in_code_lang.is_some() {
+                let fence = format!("```{}", in_code_lang.as_deref().unwrap_or(""));
+                current.push_str(&fence);
+                continuing_code_chunk = true;
+            }
+            prev_line_empty = false;
         }
 
-        if !current.is_empty() && !(last_was_empty && !seen_nonempty) {
-            current.push('\n');
+        // If a single line is still too long, hard split it (outside of code block handling).
+        if line.len() > max_len {
+            let pieces = split_long_line(line, max_len);
+            for (i, piece) in pieces.iter().enumerate() {
+                if i > 0 {
+                    blocks.push(current);
+                    current = String::new();
+                    if in_code_lang.is_some() && !is_fence {
+                        let fence = format!("```{}", in_code_lang.as_deref().unwrap_or(""));
+                        current.push_str(&fence);
+                    }
+                }
+                push_line(&mut current, piece);
+            }
+            continue;
         }
-        current.push_str(line);
-        last_was_empty = false;
-        seen_nonempty = true;
+
+        let mut line_to_push = line;
+
+        if in_code_lang.is_some() && continuing_code_chunk && prev_line_empty && !line.is_empty() {
+            line_to_push = line.trim_start();
+        }
+
+        // If we are closing a continued code block, ensure there's a blank line before the closing fence.
+        if is_fence && in_code_lang.is_some() && continuing_code_chunk && !prev_line_empty {
+            push_line(&mut current, "");
+            prev_line_empty = true;
+        }
+
+        push_line(&mut current, line_to_push);
+
+        // Toggle code fence state *after* adding the line, so we seed the next chunk correctly.
+        if is_fence {
+            if in_code_lang.is_some() {
+                in_code_lang = None;
+                continuing_code_chunk = false;
+            } else {
+                in_code_lang = Some(fence_lang);
+            }
+        }
+
+        prev_line_empty = line.is_empty();
     }
 
     if !current.is_empty() {
