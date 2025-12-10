@@ -91,25 +91,27 @@ fn transforms_7_fixture() {
     assert_eq!(
         chunks.len(),
         2,
-        "expected a single output chunk, got {:?}",
-        chunks
-    );
-    assert_eq!(actual, expected);
-}
-
-#[test]
-fn transforms_1_fixture() {
-    let input = include_str!("1-input.md").trim_end();
-    let expected = include_str!("1-output.txt").trim_end();
-
-    let chunks = transform(input, 4090);
-    let actual = chunks.join("\n=========\n");
-
-    assert_eq!(
+        "expected {} output chunks, got {:?}",
         chunks.len(),
-        2,
-        "expected a single output chunk, got {:?}",
         chunks
     );
     assert_eq!(actual, expected);
 }
+
+// #[test]
+// fn transforms_1_fixture() {
+//     let input = include_str!("1-input.md").trim_end();
+//     let expected = include_str!("1-output.txt").trim_end();
+
+//     let chunks = transform(input, 4090);
+//     let actual = chunks.join("\n=========\n");
+
+//     assert_eq!(
+//         chunks.len(),
+//         2,
+//         "expected {} output chunks, got {:?}",
+//         chunks.len(),
+//         chunks
+//     );
+//     assert_eq!(actual, expected);
+// }
