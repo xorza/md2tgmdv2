@@ -484,10 +484,52 @@ fn split_chunks(input: &str, max_len: usize) -> Vec<String> {
 }
 
 fn split_long_line(line: &str, max_len: usize) -> Vec<String> {
+    // First, try to split on word boundaries to avoid leading/trailing spaces.
+    let mut chunks: Vec<String> = Vec::new();
+    let mut current = String::new();
+
+    for word in line.split_whitespace() {
+        let word_len = word.len();
+        let extra_space = if current.is_empty() { 0 } else { 1 };
+
+        if word_len + extra_space > max_len {
+            // Word itself too long — fall back to char-level splitting.
+            if !current.is_empty() {
+                chunks.push(current);
+                current = String::new();
+            }
+            chunks.extend(split_long_word(word, max_len));
+            continue;
+        }
+
+        if current.is_empty() {
+            current.push_str(word);
+        } else if current.len() + 1 + word_len <= max_len {
+            current.push(' ');
+            current.push_str(word);
+        } else {
+            chunks.push(current);
+            current = word.to_string();
+        }
+    }
+
+    if !current.is_empty() {
+        chunks.push(current);
+    }
+
+    if chunks.is_empty() {
+        // All whitespace or empty — fall back to character splitting to preserve behavior.
+        split_long_word(line, max_len)
+    } else {
+        chunks
+    }
+}
+
+fn split_long_word(word: &str, max_len: usize) -> Vec<String> {
     let mut out = Vec::new();
     let mut buf = String::new();
 
-    for ch in line.chars() {
+    for ch in word.chars() {
         if buf.len() + ch.len_utf8() > max_len {
             out.push(buf);
             buf = String::new();

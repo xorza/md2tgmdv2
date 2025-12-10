@@ -89,5 +89,5 @@ fn test13() {
 }
 #[test]
 fn test14() {
-    transform_expect_n("12345 12345", "12345===12345", 5);
+    transform_expect_n("12345 12345", "12345\n===\n12345", 5);
 }
