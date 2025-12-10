@@ -224,6 +224,21 @@ fn heading_followed_by_list_no_blank_line() {
 }
 
 #[test]
+fn asdasd() {
+    transform_expect_1(
+        "some test\n\n---\n\nsome more test",
+        "some test\n\n————————\n\nsome more test",
+    );
+}
+#[test]
+fn asdasd2() {
+    transform_expect_1(
+        "some test\n---\nsome more test",
+        "*⭐ some test*\n\nsome more test",
+    );
+}
+
+#[test]
 fn url_not_split_across_chunks() {
     let input = "1234567890123456789012345678901234567890123456789012345678901234567890 [see docs](https://example.com/path";
     let expected = "1234567890123456789012345678901234567890123456789012345678901234567890===[see docs](https://example.com/path";
