@@ -84,11 +84,43 @@ pub fn transform(markdown: &str, max_len: usize) -> Vec<String> {
         return vec![rendered];
     }
 
+    if let Some(chunks) = split_before_first_fence(&rendered, max_len) {
+        return chunks;
+    }
+
     if let Some(chunks) = split_simple_fenced_code(&rendered, max_len) {
         return chunks;
     }
 
     word_wrap_chunks(&rendered, max_len)
+}
+
+fn split_before_first_fence(rendered: &str, max_len: usize) -> Option<Vec<String>> {
+    let fence_pos = rendered.find("```")?;
+    if fence_pos == 0 {
+        return None;
+    }
+
+    let head = rendered[..fence_pos].trim_end();
+    if head.is_empty() || head.len() > max_len {
+        return None;
+    }
+
+    let tail = rendered[fence_pos..].to_string();
+
+    let mut chunks = vec![head.to_string()];
+
+    if tail.len() <= max_len {
+        chunks.push(tail);
+        return Some(chunks);
+    }
+
+    if let Some(mut tail_chunks) = split_simple_fenced_code(&tail, max_len) {
+        chunks.append(&mut tail_chunks);
+        return Some(chunks);
+    }
+
+    None
 }
 
 fn split_simple_fenced_code(rendered: &str, max_len: usize) -> Option<Vec<String>> {
