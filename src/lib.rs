@@ -289,7 +289,7 @@ fn split_chunks(input: &str, max_len: usize) -> Vec<String> {
     let mut continuing_code_chunk = false;
     let mut prev_line_empty = false;
 
-    let mut push_line = |buf: &mut String, line: &str| {
+    let push_line = |buf: &mut String, line: &str| {
         if line.is_empty() {
             buf.push('\n');
             return;
@@ -369,7 +369,6 @@ fn split_chunks(input: &str, max_len: usize) -> Vec<String> {
         // If we are closing a continued code block, ensure there's a blank line before the closing fence.
         if is_fence && in_code_lang.is_some() && continuing_code_chunk && !prev_line_empty {
             push_line(&mut current, "");
-            prev_line_empty = true;
         }
 
         push_line(&mut current, line_to_push);
