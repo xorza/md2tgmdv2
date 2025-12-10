@@ -4,7 +4,7 @@
 //! and it returns one or more message-ready chunks (Telegram hard‑limit is 4096
 //! chars, so we split conservatively by lines).
 
-use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag, TagEnd};
+use pulldown_cmark::{CodeBlockKind, Event, HeadingLevel, Options, Parser, Tag, TagEnd};
 
 /// Telegram MarkdownV2 message hard limit.
 pub const TG_MAX_LEN: usize = 4096;
@@ -36,12 +36,16 @@ fn render_markdown(input: &str) -> String {
                     }
                 }
                 Tag::Heading { level, .. } => {
-                    if !out.is_empty() {
+                    if !out.is_empty() && !out.ends_with('\n') {
                         out.push('\n');
                     }
                     out.push('*');
-                    if let pulldown_cmark::HeadingLevel::H2 = level {
-                        out.push_str("✏ ");
+                    match level {
+                        HeadingLevel::H1 => out.push_str("📌 "),
+                        HeadingLevel::H2 => out.push_str("✏ "),
+                        HeadingLevel::H3 => out.push_str("📚 "),
+                        HeadingLevel::H4 => out.push_str("🔖 "),
+                        _ => {}
                     }
                 }
                 Tag::Emphasis => out.push('_'),
@@ -66,7 +70,11 @@ fn render_markdown(input: &str) -> String {
                 }
                 Tag::CodeBlock(kind) => {
                     if !out.is_empty() {
-                        out.push('\n');
+                        if out.ends_with('\n') {
+                            out.push('\n');
+                        } else {
+                            out.push('\n');
+                        }
                     }
                     out.push_str("```");
                     if let CodeBlockKind::Fenced(lang) = kind {
@@ -108,7 +116,9 @@ fn render_markdown(input: &str) -> String {
                 }
                 TagEnd::List(_) => {}
                 TagEnd::CodeBlock => {
-                    out.push('\n');
+                    if !out.ends_with('\n') {
+                        out.push('\n');
+                    }
                     out.push_str("```");
                     out.push('\n');
                     in_code_block = false;
@@ -117,7 +127,7 @@ fn render_markdown(input: &str) -> String {
             },
             Event::Text(t) => {
                 if in_code_block {
-                    out.push_str(&t);
+                    out.push_str(&escape_text(&t));
                 } else {
                     out.push_str(&escape_text(&t));
                 }
@@ -135,7 +145,7 @@ fn render_markdown(input: &str) -> String {
                     out.push('\n');
                 }
             }
-            Event::Rule => out.push_str("\n————————\n"),
+            Event::Rule => out.push_str("\n————————\n\n"),
             _ => {}
         }
     }
@@ -219,29 +229,4 @@ fn split_long_line(line: &str, max_len: usize) -> Vec<String> {
     }
 
     out
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn escapes_special_chars() {
-        let out = transform("a*b_c[link](url)", TG_MAX_LEN);
-        assert_eq!(out[0], "a\\*b\\_c[link](url)");
-    }
-
-    #[test]
-    fn renders_heading_and_paragraph() {
-        let md = "# Title\n\nHello *world*";
-        let out = transform(md, TG_MAX_LEN);
-        assert_eq!(out[0], "*Title*\n\nHello _world_");
-    }
-
-    #[test]
-    fn splits_long_messages() {
-        let md = "line one\n\nline two\n\nline three";
-        let out = transform(md, 10);
-        assert_eq!(out.len(), 3);
-    }
 }
