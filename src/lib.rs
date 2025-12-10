@@ -26,20 +26,47 @@ fn render_markdown(input: &str) -> String {
     let mut link_stack: Vec<String> = Vec::new();
     let mut in_code_block = false;
     let mut in_list_item = false;
+    let mut in_blockquote = false;
+    let mut has_content = false;
+    let mut prev_was_heading = false;
+
+    // Preserve leading blank lines (pulldown_cmark skips them).
+    let leading_blank = input.chars().take_while(|c| *c == '\n').count();
+    for _ in 0..leading_blank {
+        out.push('\n');
+    }
+
+    // Insert a newline, and when inside a blockquote prefix the new line
+    // with the Telegram quote marker.
+    let push_newline = |out: &mut String, in_blockquote: bool| {
+        out.push('\n');
+        if in_blockquote {
+            out.push('>');
+        }
+    };
 
     for event in parser {
         match event {
             Event::Start(tag) => match tag {
                 Tag::Paragraph => {
-                    if !out.is_empty() && !in_list_item {
-                        out.push('\n');
+                    prev_was_heading = false;
+                    if has_content && !in_list_item && !(in_blockquote && out.ends_with("**>")) {
+                        push_newline(&mut out, in_blockquote);
                     }
                 }
                 Tag::Heading { level, .. } => {
-                    if !out.is_empty() && !out.ends_with('\n') {
-                        out.push('\n');
+                    if has_content {
+                        if prev_was_heading {
+                            if !out.ends_with('\n') {
+                                push_newline(&mut out, in_blockquote);
+                            }
+                        } else if !out.ends_with("\n\n") {
+                            push_newline(&mut out, in_blockquote);
+                        }
                     }
                     out.push('*');
+                    has_content = true;
+                    prev_was_heading = true;
                     match level {
                         HeadingLevel::H1 => out.push_str("📌 "),
                         HeadingLevel::H2 => out.push_str("✏ "),
@@ -48,35 +75,62 @@ fn render_markdown(input: &str) -> String {
                         _ => {}
                     }
                 }
-                Tag::Emphasis => out.push('_'),
-                Tag::Strong => out.push('*'),
-                Tag::Strikethrough => out.push('~'),
+                Tag::BlockQuote(_) => {
+                    prev_was_heading = false;
+                    if has_content && !out.ends_with("\n\n") {
+                        push_newline(&mut out, in_blockquote);
+                    }
+                    out.push_str("**>");
+                    has_content = true;
+                    in_blockquote = true;
+                }
+                Tag::Emphasis => {
+                    out.push('_');
+                    has_content = true;
+                }
+                Tag::Strong => {
+                    out.push('*');
+                    has_content = true;
+                }
+                Tag::Strikethrough => {
+                    out.push('~');
+                    has_content = true;
+                }
                 Tag::Link { dest_url, .. } => {
                     link_stack.push(dest_url.to_string());
                     out.push('[');
+                    has_content = true;
                 }
                 Tag::List(_) => {
-                    if !out.is_empty() {
-                        out.push('\n');
+                    prev_was_heading = false;
+                    if has_content {
+                        if in_blockquote {
+                            if !out.ends_with('\n') && !out.ends_with('>') {
+                                push_newline(&mut out, in_blockquote);
+                            }
+                        } else {
+                            push_newline(&mut out, in_blockquote);
+                        }
                     }
                 }
                 Tag::Item => {
-                    if !out.ends_with('\n') && !out.is_empty() {
-                        out.push('\n');
+                    prev_was_heading = false;
+                    if has_content && !out.ends_with('\n') && !(in_blockquote && out.ends_with('>'))
+                    {
+                        push_newline(&mut out, in_blockquote);
                     }
                     out.push('⦁');
                     out.push(' ');
+                    has_content = true;
                     in_list_item = true;
                 }
                 Tag::CodeBlock(kind) => {
-                    if !out.is_empty() {
-                        if out.ends_with('\n') {
-                            out.push('\n');
-                        } else {
-                            out.push('\n');
-                        }
+                    prev_was_heading = false;
+                    if has_content {
+                        push_newline(&mut out, in_blockquote);
                     }
                     out.push_str("```");
+                    has_content = true;
                     if let CodeBlockKind::Fenced(lang) = kind {
                         if !lang.is_empty() {
                             out.push_str(lang.as_ref());
@@ -90,12 +144,12 @@ fn render_markdown(input: &str) -> String {
             Event::End(tag) => match tag {
                 TagEnd::Paragraph => {
                     if !in_list_item {
-                        out.push('\n');
+                        push_newline(&mut out, in_blockquote);
                     }
                 }
                 TagEnd::Heading(_) => {
                     out.push('*');
-                    out.push('\n');
+                    push_newline(&mut out, in_blockquote);
                 }
                 TagEnd::Emphasis => out.push('_'),
                 TagEnd::Strong => out.push('*'),
@@ -109,19 +163,28 @@ fn render_markdown(input: &str) -> String {
                     }
                 }
                 TagEnd::Item => {
-                    if !out.ends_with('\n') {
-                        out.push('\n');
-                    }
                     in_list_item = false;
                 }
                 TagEnd::List(_) => {}
                 TagEnd::CodeBlock => {
                     if !out.ends_with('\n') {
-                        out.push('\n');
+                        push_newline(&mut out, in_blockquote);
                     }
                     out.push_str("```");
-                    out.push('\n');
+                    push_newline(&mut out, in_blockquote);
                     in_code_block = false;
+                }
+                TagEnd::BlockQuote(_) => {
+                    // If we ended up with a dangling quote marker for the next line,
+                    // drop it so the blockquote closes cleanly.
+                    if out.ends_with('>') {
+                        out.pop();
+                        if out.ends_with('\n') {
+                            out.pop();
+                        }
+                    }
+                    out.push_str("||");
+                    in_blockquote = false;
                 }
                 _ => {}
             },
@@ -131,26 +194,39 @@ fn render_markdown(input: &str) -> String {
                 } else {
                     out.push_str(&escape_text(&t));
                 }
+                if !t.is_empty() {
+                    has_content = true;
+                }
             }
             Event::Code(t) => {
                 out.push('`');
                 out.push_str(&escape_text(&t));
                 out.push('`');
+                has_content = true;
             }
             Event::SoftBreak => out.push(' '),
             Event::HardBreak => {
                 if in_list_item {
-                    out.push_str("  \n  ");
+                    out.push_str("  ");
+                    push_newline(&mut out, in_blockquote);
+                    out.push_str("  ");
                 } else {
-                    out.push('\n');
+                    push_newline(&mut out, in_blockquote);
                 }
             }
-            Event::Rule => out.push_str("\n————————\n\n"),
+            Event::Rule => {
+                if out.ends_with('\n') {
+                    out.push_str("\n————————\n\n");
+                } else {
+                    out.push_str("\n\n————————\n\n");
+                }
+                has_content = true;
+            }
             _ => {}
         }
     }
 
-    out.trim().to_string()
+    out.trim_end().to_string()
 }
 
 const SPECIALS: [char; 19] = [
@@ -176,8 +252,21 @@ fn escape_url(s: &str) -> String {
 fn split_chunks(input: &str, max_len: usize) -> Vec<String> {
     let mut blocks = Vec::new();
     let mut current = String::new();
+    let mut last_was_empty = false;
+    let mut seen_nonempty = false;
 
     for line in input.lines() {
+        // Preserve empty lines (including leading ones).
+        if line.is_empty() {
+            if current.len() + 1 > max_len && !current.is_empty() {
+                blocks.push(current);
+                current = String::new();
+            }
+            current.push('\n');
+            last_was_empty = true;
+            continue;
+        }
+
         // If a single line is longer than the limit, flush current and hard-split the line.
         if line.len() > max_len {
             if !current.is_empty() {
@@ -185,6 +274,7 @@ fn split_chunks(input: &str, max_len: usize) -> Vec<String> {
                 current = String::new();
             }
             blocks.extend(split_long_line(line, max_len));
+            last_was_empty = false;
             continue;
         }
 
@@ -199,10 +289,12 @@ fn split_chunks(input: &str, max_len: usize) -> Vec<String> {
             current = String::new();
         }
 
-        if !current.is_empty() {
+        if !current.is_empty() && !(last_was_empty && !seen_nonempty) {
             current.push('\n');
         }
         current.push_str(line);
+        last_was_empty = false;
+        seen_nonempty = true;
     }
 
     if !current.is_empty() {
