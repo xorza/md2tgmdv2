@@ -7,6 +7,13 @@ fn transform_expect_1(input: &str, expected: &str) {
     assert_eq!(chunks[0], expected);
 }
 
+fn transform_expect_n(input: &str, expected: &str, max_chunk_length: usize) {
+    let chunks = transform(input, max_chunk_length);
+    let actual = chunks.join("\n===\n");
+
+    assert_eq!(actual, expected);
+}
+
 #[test]
 fn test1() {
     transform_expect_1("- **Split** it into", "⦁ *Split* it into");
@@ -68,4 +75,19 @@ fn test10() {
 #[test]
 fn test11() {
     transform_expect_1("> You\n> \n> Hi", ">You\n>\n>Hi");
+}
+#[test]
+fn test12() {
+    transform_expect_1(
+        "> - Greetings\n> - Repetitive",
+        ">⦁ Greetings\n>⦁ Repetitive",
+    );
+}
+#[test]
+fn test13() {
+    transform_expect_1("> **GOAL:** ", ">*GOAL:*");
+}
+#[test]
+fn test14() {
+    transform_expect_n("12345 12345", "12345===12345", 5);
 }
