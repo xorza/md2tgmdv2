@@ -329,11 +329,12 @@ fn render_markdown(input: &str) -> String {
                         has_content = true;
                         prev_was_heading = true;
                         match level {
-                            HeadingLevel::H1 => out.push_str("📌 "),
-                            HeadingLevel::H2 => out.push_str("✏ "),
-                            HeadingLevel::H3 => out.push_str("📚 "),
-                            HeadingLevel::H4 => out.push_str("🔖 "),
-                            _ => {}
+                            HeadingLevel::H1 => out.push_str("⭐⭐ "),
+                            HeadingLevel::H2 => out.push_str("⭐ "),
+                            HeadingLevel::H3 => out.push_str("🔸🔸 "),
+                            HeadingLevel::H4 => out.push_str("🔸 "),
+                            HeadingLevel::H5 => out.push_str("▪️ "),
+                            HeadingLevel::H6 => out.push_str("· "),
                         }
                     }
                     Tag::BlockQuote(_) => {
