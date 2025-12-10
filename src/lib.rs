@@ -1,4 +1,4 @@
-//! md2tgmdv2 — minimal Markdown → Telegram MarkdownV2 renderer.
+//! md2tgmdv2 — Markdown → Telegram MarkdownV2 renderer.
 //!
 //! The public entry point is [`transform`]: feed it any Markdown string
 //! and it returns one or more message-ready chunks (Telegram hard‑limit is 4096
