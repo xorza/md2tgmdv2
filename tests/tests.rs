@@ -102,11 +102,6 @@ fn preserves_code_block_language_and_escapes() {
 }
 
 #[test]
-fn trims_blockquote_trailing_whitespace() {
-    transform_expect_1("> You.\n>  ", ">You\\.");
-}
-
-#[test]
 fn preserves_blockquote_blank_line() {
     transform_expect_1("> You\n> \n> Hi", ">You\n>\n>Hi");
 }
@@ -184,22 +179,6 @@ fn splits_mixed_text_and_code_block() {
     );
 }
 
-// #[test]
-// fn removes_empty_lines_on_split_1() {
-//     transform_expect_n(
-//         "> 1234567890\n> \n> 1234567890",
-//         ">1234567890===>1234567890",
-//         14,
-//     );
-// }
-// #[test]
-// fn removes_empty_lines_on_split_2() {
-//     transform_expect_n(
-//         "> 1234567890\n> \n> 1234567890",
-//         ">1234567890===>1234567890",
-//         12,
-//     );
-// }
 #[test]
 fn removes_empty_lines_on_split_3() {
     transform_expect_n("1234567890\n\n1234567890", "1234567890===1234567890", 10);
@@ -219,8 +198,8 @@ fn test1() {
     let actual = chunks.join("===");
     let expected = include_str!("2-output.txt");
 
-    std::fs::write("tests/2-output.txt", &actual).unwrap();
-    // assert_eq!(actual, expected);
+    // std::fs::write("tests/2-output.txt", &actual).unwrap();
+    assert_eq!(actual, expected);
 }
 
 #[test]
@@ -229,8 +208,8 @@ fn test3() {
     let chunks = transform(input, TELEGRAM_BOT_MAX_MESSAGE_LENGTH);
     let actual = chunks.join("===");
 
-    std::fs::write("tests/1-output.txt", &actual).unwrap();
+    // std::fs::write("tests/1-output.txt", &actual).unwrap();
 
-    // let expected = include_str!("1-output.txt");
-    // assert_eq!(actual, expected);
+    let expected = include_str!("1-output.txt");
+    assert_eq!(actual, expected);
 }

@@ -11,7 +11,6 @@
 >
 >*EXCLUDE OR MINIMIZE:*
 >⦁ Greetings, small talk, and filler conversation
->
 >⦁ Repetitive text that adds no new information
 >⦁ Very low‑level intermediate steps or details unlikely to matter later
 >

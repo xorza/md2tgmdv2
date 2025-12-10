@@ -86,11 +86,7 @@ pub fn transform(markdown: &str, max_len: usize) -> Vec<String> {
         return vec![trim_chunk(&rendered_with_markers)];
     }
 
-    let rendered = if max_len < 100 {
-        remove_empty_blockquote_lines(&rendered_with_markers)
-    } else {
-        rendered_with_markers.clone()
-    };
+    let rendered = rendered_with_markers.clone();
 
     if let Some(chunks) = split_before_first_fence(&rendered, max_len) {
         return normalize_chunks(chunks);
@@ -229,21 +225,6 @@ fn word_wrap_chunks(rendered: &str, max_len: usize) -> Vec<String> {
     }
 }
 
-fn remove_empty_blockquote_lines(rendered: &str) -> String {
-    let mut out = String::new();
-    for (i, line) in rendered.lines().enumerate() {
-        let trimmed = line.trim();
-        if trimmed == ">" {
-            continue;
-        }
-        if i > 0 && !out.is_empty() {
-            out.push('\n');
-        }
-        out.push_str(line);
-    }
-    out
-}
-
 fn trim_chunk(s: &str) -> String {
     s.trim_end_matches('\n').to_string()
 }
@@ -281,10 +262,6 @@ fn restore_blockquote_blank_lines(original: &str, rendered: &str) -> String {
     // Append any remaining rendered lines (e.g., renderer inserted extra blanks).
     for r in rendered_lines.iter().skip(idx) {
         out.push((*r).to_string());
-    }
-
-    while matches!(out.last(), Some(s) if s.trim() == ">") {
-        out.pop();
     }
 
     out.join("\n")
