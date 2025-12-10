@@ -12,6 +12,15 @@ fn transform_expect_n(input: &str, expected: &str, max_chunk_length: usize) {
     let actual = chunks.join("===");
 
     assert_eq!(actual, expected);
+    for (i, chunk) in chunks.iter().enumerate() {
+        assert!(
+            chunk.len() <= max_chunk_length,
+            "chunk {} length {} exceeds max_chunk_length {}",
+            i,
+            chunk.len(),
+            max_chunk_length
+        );
+    }
 }
 
 #[test]
