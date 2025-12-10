@@ -195,22 +195,30 @@ fn word_wrap_chunks(rendered: &str, max_len: usize) -> Vec<String> {
         };
     }
 
-    // Otherwise, split on whitespace to mirror expected test behavior.
+    // Otherwise, split on whitespace but keep inline links `[text](url)` intact
+    // even when their display text contains spaces.
     let mut chunks = Vec::new();
     let mut current = String::new();
 
-    for word in rendered.split_whitespace() {
+    for token in tokenize_preserving_links(rendered) {
         let extra = if current.is_empty() { 0 } else { 1 };
-        if current.len() + extra + word.len() <= max_len {
+        if current.len() + extra + token.len() <= max_len {
             if extra == 1 {
                 current.push(' ');
             }
-            current.push_str(word);
+            current.push_str(&token);
         } else {
             if !current.is_empty() {
                 chunks.push(current);
             }
-            current = word.to_string();
+            if token.len() > max_len {
+                for piece in split_long_word(&token, max_len) {
+                    chunks.push(piece);
+                }
+                current = String::new();
+            } else {
+                current = token;
+            }
         }
     }
 
@@ -522,6 +530,67 @@ fn escape_text(s: &str) -> String {
 fn escape_url(s: &str) -> String {
     // Telegram only needs parentheses escaped in URLs when used inside markdown syntax.
     s.replace(')', "\\)").replace('(', "\\(")
+}
+
+fn tokenize_preserving_links(s: &str) -> Vec<String> {
+    let mut tokens = Vec::new();
+    let bytes = s.as_bytes();
+    let len = bytes.len();
+    let mut i = 0;
+
+    while i < len {
+        // Skip any whitespace; we only need tokens.
+        if bytes[i].is_ascii_whitespace() {
+            i += 1;
+            continue;
+        }
+
+        // Try to capture an escaped markdown link `\[...]\(...)` as a single token.
+        if bytes[i] == b'\\' && i + 1 < len && bytes[i + 1] == b'[' {
+            if let Some(bracket_rel) = s[i + 2..].find("\\]") {
+                let end_bracket = i + 2 + bracket_rel; // points to start of "\\]"
+                let after_bracket = end_bracket + 2;
+                if after_bracket + 1 < len && s[after_bracket..].starts_with("\\(") {
+                    let end = if let Some(paren_rel) = s[after_bracket + 2..].find("\\)") {
+                        let end_paren = after_bracket + 2 + paren_rel; // start of "\\)"
+                        (end_paren + 2).min(len)
+                    } else {
+                        len
+                    };
+                    let mut token = s[i..end].to_string();
+                    token.retain(|c| c != '\\');
+                    tokens.push(token);
+                    i = end;
+                    continue;
+                }
+            }
+        }
+
+        // Fallback for non-escaped forms (should be rare post-escape).
+        if bytes[i] == b'[' && i + 1 < len {
+            if let Some(bracket_rel) = s[i + 1..].find(']') {
+                let end_bracket = i + 1 + bracket_rel;
+                if end_bracket + 1 < len && bytes[end_bracket + 1] == b'(' {
+                    if let Some(paren_rel) = s[end_bracket + 2..].find(')') {
+                        let end_paren = end_bracket + 2 + paren_rel + 1;
+                        let end = end_paren.min(len);
+                        tokens.push(s[i..end].to_string());
+                        i = end;
+                        continue;
+                    }
+                }
+            }
+        }
+
+        // Fallback: read until next whitespace.
+        let start = i;
+        while i < len && !bytes[i].is_ascii_whitespace() {
+            i += 1;
+        }
+        tokens.push(s[start..i].to_string());
+    }
+
+    tokens
 }
 
 fn split_long_word(word: &str, max_len: usize) -> Vec<String> {
