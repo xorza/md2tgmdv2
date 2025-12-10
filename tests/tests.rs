@@ -1,3 +1,5 @@
+use std::thread::AccessError;
+
 use md2tgmdv2::{TG_MAX_LEN, transform};
 
 #[test]
@@ -78,4 +80,21 @@ fn transforms_6_fixture() {
         chunks
     );
     assert_eq!(chunks[0], expected);
+}
+
+#[test]
+fn transforms_7_fixture() {
+    let input = include_str!("7-input.md").trim_end();
+    let expected = include_str!("7-output.txt").trim_end();
+
+    let chunks = transform(input, 280);
+    let actual = chunks.join("\n=========\n");
+
+    assert_eq!(
+        chunks.len(),
+        2,
+        "expected a single output chunk, got {:?}",
+        chunks
+    );
+    assert_eq!(actual, expected);
 }

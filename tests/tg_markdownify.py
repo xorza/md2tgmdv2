@@ -27,7 +27,7 @@ def main() -> int:
             interpreters_use=interpreter_chain,
             latex_escape=True,
             normalize_whitespace=True,
-            max_word_count=4090,
+            max_word_count=999999,
         )
 
     boxes = asyncio.run(run())
@@ -38,7 +38,7 @@ def main() -> int:
         if item.content_type == ContentTypes.TEXT and item.content is not None
     ]
 
-    output = "\n\n=========\n\n".join(blocks)
+    output = "\n=========\n".join(blocks)
     Path(args.output_file).parent.mkdir(parents=True, exist_ok=True)
     Path(args.output_file).write_text(output, encoding="utf-8")
     return 0
