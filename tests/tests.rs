@@ -110,28 +110,29 @@ fn converts_list_inside_blockquote() {
     );
 }
 
-// #[test]
-// fn converts_bold_inside_blockquote() {
-//     transform_expect_1("> **GOAL:** ", ">*GOAL:*");
-// }
+#[test]
+fn converts_bold_inside_blockquote() {
+    transform_expect_1("> **GOAL:** ", ">*GOAL:*");
+}
 
-// #[test]
-// fn preserves_blockquote_blank_line_before_heading() {
-//     transform_expect_1(
-//         "> - Any decisions made, final answers given, or conclusions reached\n\
-//          > - Any explicit open questions or TODO items mentioned\n\
-//          > \n\
-//          > **EXCLUDE OR MINIMIZE:**\n\
-//          > - Greetings, small talk, and filler conversation\n\
-//          > - Repetitive text that adds no new information\n",
-//         ">⦁ Any decisions made, final answers given, or conclusions reached\n\
-//          >⦁ Any explicit open questions or TODO items mentioned\n\
-//          >\n\
-//          >*EXCLUDE OR MINIMIZE:*\n\
-//          >⦁ Greetings, small talk, and filler conversation\n\
-//          >⦁ Repetitive text that adds no new information",
-//     );
-// }
+#[test]
+fn preserves_blockquote_blank_line_before_heading() {
+    transform_expect_1(
+        "> - Any decisions made, final answers given, or conclusions reached\n\
+         > - Any explicit open questions or TODO items mentioned\n\
+         > \n\
+         > **EXCLUDE OR MINIMIZE:**\n\
+         > - Greetings, small talk, and filler conversation\n\
+         > - Repetitive text that adds no new information\n",
+        ">⦁ Any decisions made, final answers given, or conclusions reached\n\
+         >⦁ Any explicit open questions or TODO items mentioned\n\
+         >\n\
+         >*EXCLUDE OR MINIMIZE:*\n\
+         >\n\
+         >⦁ Greetings, small talk, and filler conversation\n\
+         >⦁ Repetitive text that adds no new information",
+    );
+}
 
 // #[test]
 // fn splits_words_to_fit_len_5() {

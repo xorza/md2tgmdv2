@@ -319,6 +319,7 @@ impl Converter {
             }
             TagEnd::List(_) => {
                 self.list = false;
+                self.add_new_line = true;
 
                 println!("EndList");
             }
