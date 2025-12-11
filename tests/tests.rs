@@ -220,10 +220,10 @@ fn preserves_blockquote_blank_line_before_heading() {
 //     transform_expect_1("1. First\n2. Second", "⦁ First\n⦁ Second");
 // }
 
-// #[test]
-// fn nested_blockquote_preserves_levels() {
-//     transform_expect_1("> > Nested", ">>Nested");
-// }
+#[test]
+fn nested_blockquote_preserves_levels() {
+    transform_expect_1("> > Nested", ">>Nested");
+}
 
 // #[test]
 // fn inline_link_escapes_parens_in_url() {
@@ -233,10 +233,10 @@ fn preserves_blockquote_blank_line_before_heading() {
 //     );
 // }
 
-// #[test]
-// fn heading_followed_by_list_no_blank_line() {
-//     transform_expect_1("## Heading\n- item", "*⭐ Heading*\n⦁ item");
-// }
+#[test]
+fn heading_followed_by_list_no_blank_line() {
+    transform_expect_1("## Heading\n- item", "*⭐ Heading*\n\n⦁ item");
+}
 
 #[test]
 fn asdasd() {

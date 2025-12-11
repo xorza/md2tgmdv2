@@ -18,7 +18,7 @@ pub struct Converter {
     result: Vec<String>,
     stack: Vec<Descriptor>,
     add_new_line: bool,
-    quote: bool,
+    quote_level: u8,
     list: bool,
 }
 
@@ -36,7 +36,7 @@ impl Default for Converter {
             result: vec![],
             stack: Vec::new(),
             add_new_line: false,
-            quote: false,
+            quote_level: 0,
             list: false,
         }
     }
@@ -152,8 +152,8 @@ impl Converter {
 
         if self.add_new_line {
             last.push_str("\n");
-            if self.quote {
-                last.push_str(">");
+            if self.quote_level > 0 {
+                last.push_str(&">".repeat(self.quote_level as usize));
             }
             self.add_new_line = false;
         }
@@ -162,8 +162,8 @@ impl Converter {
             if !last.is_empty() {
                 last.push_str("\n");
             }
-            if self.quote {
-                last.push_str(">");
+            if self.quote_level > 0 {
+                last.push_str(&">".repeat(self.quote_level as usize));
             }
             return;
         }
@@ -196,7 +196,7 @@ impl Converter {
                 println!("Heading");
             }
             Tag::BlockQuote(_) => {
-                self.quote = true;
+                self.quote_level += 1;
 
                 println!("BlockQuote");
             }
