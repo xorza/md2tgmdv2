@@ -69,28 +69,30 @@ impl Converter {
                     self.end_tag(tag)?;
                 }
                 Event::Text(txt) => {
-                    self.add_to_result(&txt, true);
+                    self.output(&txt, true);
                 }
                 Event::Code(txt) => {
-                    println!("{}", txt);
+                    self.output("`", false);
+                    self.output(&txt, true);
+                    self.output("`", false);
                 }
                 Event::InlineMath(txt) => {
-                    println!("{}", txt);
+                    println!("InlineMath");
                 }
                 Event::DisplayMath(txt) => {
-                    println!("{}", txt);
+                    println!("DisplayMath");
                 }
                 Event::Html(txt) => {
-                    println!("{}", txt);
+                    println!("Html");
                 }
                 Event::InlineHtml(txt) => {
-                    println!("{}", txt);
+                    println!("InlineHtml");
                 }
                 Event::FootnoteReference(txt) => {
-                    println!("{}", txt);
+                    println!("FootnoteReference");
                 }
                 Event::SoftBreak => {
-                    self.add_to_result("\n", false);
+                    self.output("\n", false);
                     println!("SoftBreak");
                 }
                 Event::HardBreak => {
@@ -111,10 +113,10 @@ impl Converter {
 
         Ok(std::mem::take(&mut self.result))
     }
-    fn start_new_line(&mut self) {
-        self.add_to_result("\n", false);
+    fn output_new_line(&mut self) {
+        self.output("\n", false);
     }
-    fn add_to_result(&mut self, txt: &str, escape: bool) {
+    fn output(&mut self, txt: &str, escape: bool) {
         if self.add_new_line {
             self.result.last_mut().unwrap().push_str("\n");
             self.add_new_line = false;
@@ -135,19 +137,19 @@ impl Converter {
     fn start_tag(&mut self, tag: Tag) -> anyhow::Result<()> {
         match tag {
             Tag::Paragraph => {
-                self.start_new_line();
+                self.output_new_line();
                 self.stack.push(Descriptor::Paragraph);
 
                 println!("Paragraph");
             }
             Tag::Heading { level, .. } => {
                 match level {
-                    HeadingLevel::H1 => self.add_to_result("*⭐⭐ ", false),
-                    HeadingLevel::H2 => self.add_to_result("*⭐ ", false),
-                    HeadingLevel::H3 => self.add_to_result("*", false),
-                    HeadingLevel::H4 => self.add_to_result("*", false),
-                    HeadingLevel::H5 => self.add_to_result("", false),
-                    HeadingLevel::H6 => self.add_to_result("", false),
+                    HeadingLevel::H1 => self.output("*⭐⭐ ", false),
+                    HeadingLevel::H2 => self.output("*⭐ ", false),
+                    HeadingLevel::H3 => self.output("*", false),
+                    HeadingLevel::H4 => self.output("*", false),
+                    HeadingLevel::H5 => self.output("", false),
+                    HeadingLevel::H6 => self.output("", false),
                 }
                 println!("Heading");
             }
@@ -166,8 +168,8 @@ impl Converter {
                 println!("List");
             }
             Tag::Item => {
-                self.start_new_line();
-                self.add_to_result("⦁ ", false);
+                self.output_new_line();
+                self.output("⦁ ", false);
                 self.stack.push(Descriptor::Item);
 
                 println!("Item");
@@ -194,12 +196,12 @@ impl Converter {
                 println!("Superscript");
             }
             Tag::Emphasis => {
-                self.add_to_result("_", false);
+                self.output("_", false);
                 self.stack.push(Descriptor::Emphasis);
                 println!("Emphasis");
             }
             Tag::Strong => {
-                self.add_to_result("*", false);
+                self.output("*", false);
                 self.stack.push(Descriptor::Strong);
                 println!("Strong");
             }
@@ -238,12 +240,12 @@ impl Converter {
             }
             TagEnd::Heading(level) => {
                 match level {
-                    HeadingLevel::H1 => self.add_to_result("*", false),
-                    HeadingLevel::H2 => self.add_to_result("*", false),
-                    HeadingLevel::H3 => self.add_to_result("*", false),
-                    HeadingLevel::H4 => self.add_to_result("*", false),
-                    HeadingLevel::H5 => self.add_to_result("", false),
-                    HeadingLevel::H6 => self.add_to_result("", false),
+                    HeadingLevel::H1 => self.output("*", false),
+                    HeadingLevel::H2 => self.output("*", false),
+                    HeadingLevel::H3 => self.output("*", false),
+                    HeadingLevel::H4 => self.output("*", false),
+                    HeadingLevel::H5 => self.output("", false),
+                    HeadingLevel::H6 => self.output("", false),
                 }
                 println!("EndHeading");
             }
@@ -287,12 +289,12 @@ impl Converter {
             }
             TagEnd::Emphasis => {
                 println!("EndEmphasis");
-                self.add_to_result("_", false);
+                self.output("_", false);
                 self.close_descriptor(Descriptor::Emphasis)?;
             }
             TagEnd::Strong => {
                 println!("EndStrong");
-                self.add_to_result("*", false);
+                self.output("*", false);
                 self.close_descriptor(Descriptor::Strong)?;
             }
             TagEnd::Strikethrough => {

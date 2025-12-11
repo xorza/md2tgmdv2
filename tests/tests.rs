@@ -73,13 +73,13 @@ fn converts_heading() {
     transform_expect_1("## 1. What", "*⭐ 1\\. What*");
 }
 
-// #[test]
-// fn escapes_inline_code() {
-//     transform_expect_1(
-//         "`messages = [{role: \"user\"|\"assistant\", content: string}, …]`",
-//         "`messages \\= \\[\\{role: \"user\"\\|\"assistant\", content: string\\}, …\\]`",
-//     );
-// }
+#[test]
+fn escapes_inline_code() {
+    transform_expect_1(
+        "`messages = [{role: \"user\"|\"assistant\", content: string}, …]`",
+        "`messages \\= \\[\\{role: \"user\"\\|\"assistant\", content: string\\}, …\\]`",
+    );
+}
 
 // #[test]
 // fn list_after_blank_line() {
