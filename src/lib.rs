@@ -20,7 +20,7 @@ pub struct Converter {
     add_new_line: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 enum Descriptor {
     Paragraph,
     Item,
@@ -141,6 +141,7 @@ impl Converter {
 
         Ok(std::mem::take(&mut self.result))
     }
+
     fn output_new_line(&mut self) {
         self.output("\n", false);
     }
@@ -185,7 +186,15 @@ impl Converter {
             Tag::BlockQuote(_) => {
                 println!("BlockQuote");
             }
-            Tag::CodeBlock(_) => {
+            Tag::CodeBlock(kind) => {
+                let lang = match kind {
+                    CodeBlockKind::Fenced(lang) => lang.to_string(),
+                    CodeBlockKind::Indented => String::new(),
+                };
+                self.output("```", false);
+                self.output(&lang, false);
+                self.stack.push(Descriptor::CodeBlock(lang));
+
                 println!("CodeBlock");
             }
             Tag::HtmlBlock => {
@@ -284,6 +293,10 @@ impl Converter {
                 println!("EndBlockQuote");
             }
             TagEnd::CodeBlock => {
+                self.output("```", false);
+                self.add_new_line = true;
+                self.close_descriptor(Descriptor::CodeBlock(String::new()))?;
+
                 println!("EndCodeBlock");
             }
             TagEnd::HtmlBlock => {
@@ -369,26 +382,36 @@ impl Converter {
     }
 }
 fn escape_text(text: &str) -> String {
-    text.replace('\\', "\\\\")
-        .replace('*', "\\*")
-        .replace('_', "\\_")
-        .replace('[', "\\[")
-        .replace(']', "\\]")
-        .replace('(', "\\(")
-        .replace(')', "\\)")
-        .replace('~', "\\~")
-        .replace('`', "\\`")
-        .replace('>', "\\>")
-        .replace('#', "\\#")
-        .replace('+', "\\+")
-        .replace('-', "\\-")
-        .replace('=', "\\=")
-        .replace('|', "\\|")
-        .replace('{', "\\{")
-        .replace('}', "\\}")
-        .replace('.', "\\.")
-        .replace('!', "\\!")
+    // Single pass escape to avoid O(n*k) replace chaining.
+    let mut out = String::with_capacity(text.len() * 2); // worst case every char escapes
+    for ch in text.chars() {
+        match ch {
+            '\\' | '*' | '_' | '[' | ']' | '(' | ')' | '~' | '`' | '>' | '#' | '+' | '-' | '='
+            | '|' | '{' | '}' | '.' | '!' => {
+                out.push('\\');
+                out.push(ch);
+            }
+            _ => out.push(ch),
+        }
+    }
+    out
 }
+
+impl PartialEq for Descriptor {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Descriptor::Paragraph, Descriptor::Paragraph) => true,
+            (Descriptor::Item, Descriptor::Item) => true,
+            (Descriptor::Strong, Descriptor::Strong) => true,
+            (Descriptor::Emphasis, Descriptor::Emphasis) => true,
+            (Descriptor::CodeBlock(_), Descriptor::CodeBlock(_)) => true,
+            _ => false,
+        }
+    }
+}
+
+impl Eq for Descriptor {}
+
 // #[test]
 // fn test() -> anyhow::Result<()> {
 //     let text = include_str!("../tests/1-input.md");
