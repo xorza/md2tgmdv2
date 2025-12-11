@@ -11,11 +11,24 @@ pub const TELEGRAM_BOT_MAX_MESSAGE_LENGTH: usize = 4096;
 #[derive(Debug)]
 pub struct Converter {
     max_len: usize,
+    buffer: String,
+}
+
+impl Default for Converter {
+    fn default() -> Self {
+        Self {
+            max_len: TELEGRAM_BOT_MAX_MESSAGE_LENGTH,
+            buffer: String::new(),
+        }
+    }
 }
 
 impl Converter {
     pub fn new(max_len: usize) -> Self {
-        Self { max_len }
+        Self {
+            max_len,
+            ..Default::default()
+        }
     }
 
     /// Convert Markdown into Telegram MarkdownV2 and split into safe chunks.
@@ -24,10 +37,10 @@ impl Converter {
         for event in parser {
             match event {
                 Event::Start(tag) => {
-                    start_tag(tag);
+                    self.start_tag(tag);
                 }
                 Event::End(tag) => {
-                    end_tag(tag);
+                    self.end_tag(tag);
                 }
                 Event::Text(txt) => {
                     println!("{}", txt);
@@ -214,12 +227,6 @@ impl Converter {
                 println!("EndDefinitionListDefinition");
             }
         }
-    }
-}
-
-impl Default for Converter {
-    fn default() -> Self {
-        Self::new(TELEGRAM_BOT_MAX_MESSAGE_LENGTH)
     }
 }
 
