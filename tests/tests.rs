@@ -207,18 +207,26 @@ fn preserves_blockquote_blank_line_before_heading() {
 //     );
 // }
 
-// #[test]
-// fn text_in_angle_brackets_should_not_be_removed() {
-//     transform_expect_1(
-//         "> <insert segment_summary>  ",
-//         "><insert segment\\_summary\\>",
-//     );
-// }
+#[test]
+fn text_in_angle_brackets_should_not_be_removed() {
+    transform_expect_1(
+        ">hello <insert segment_summary>  ",
+        ">hello <insert segment\\_summary\\>",
+    );
+}
 
-// #[test]
-// fn ordered_list_items_convert() {
-//     transform_expect_1("1. First\n2. Second", "⦁ First\n⦁ Second");
-// }
+#[test]
+fn text_in_angle_brackets_should_not_be_removed1() {
+    transform_expect_1(
+        "> <insert segment_summary>  ",
+        "><insert segment\\_summary\\>",
+    );
+}
+
+#[test]
+fn ordered_list_items_convert() {
+    transform_expect_1("1. First\n2. Second", "⦁ First\n⦁ Second");
+}
 
 #[test]
 fn nested_blockquote_preserves_levels() {

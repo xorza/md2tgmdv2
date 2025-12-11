@@ -168,6 +168,10 @@ impl Converter {
             return;
         }
 
+        if last.is_empty() && self.quote_level > 0 {
+            last.push_str(&">".repeat(self.quote_level as usize));
+        }
+
         if escape {
             let escaped = escape_text(&txt);
             last.push_str(&escaped);
