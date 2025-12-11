@@ -198,6 +198,7 @@ impl Converter {
                 println!("Paragraph");
             }
             Tag::Heading { level, .. } => {
+                self.output_new_line();
                 match level {
                     HeadingLevel::H1 => self.output("*⭐⭐ ", false),
                     HeadingLevel::H2 => self.output("*⭐ ", false),
@@ -325,6 +326,7 @@ impl Converter {
             }
             TagEnd::BlockQuote(_) => {
                 self.add_new_line = true;
+                self.quote_level -= 1;
 
                 println!("EndBlockQuote");
             }

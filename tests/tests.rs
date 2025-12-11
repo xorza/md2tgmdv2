@@ -211,6 +211,13 @@ fn converts_blockquote_with_list_and_bold() {
     transform_expect_1(input, expected);
 }
 
+#[test]
+fn converts_blockquote_heading_and_list_item() {
+    let input = "> **GOAL:**\n> - Merge.";
+    let expected = ">*GOAL:*\n\n>⦁ Merge\\.";
+    transform_expect_1(input, expected);
+}
+
 // #[test]
 // fn splits_words_to_fit_len_5() {
 //     transform_expect_n("12345 12345", "12345===12345", 5);
@@ -283,16 +290,18 @@ fn converts_blockquote_with_list_and_bold() {
 //     transform_expect_n(input, expected, 80);
 // }
 
-// #[test]
-// fn test1() {
-//     let input = include_str!("1-input.md");
-//     let chunks = transform(input, TELEGRAM_BOT_MAX_MESSAGE_LENGTH);
-//     let actual = chunks.join("===");
-//     let expected = include_str!("1-output.txt");
+#[test]
+fn test1() -> anyhow::Result<()> {
+    let input = include_str!("1-input.md");
+    let chunks = Converter::new(999999).go(input)?;
+    let actual = chunks.join("===");
+    let expected = include_str!("1-output.txt");
 
-//     std::fs::write("tests/1-output.txt", &actual).unwrap();
-//     // assert_eq!(actual, expected);
-// }
+    //std::fs::write("tests/1-output.txt", &actual).unwrap();
+    assert_eq!(actual, expected);
+
+    Ok(())
+}
 
 // #[test]
 // fn test2() {
