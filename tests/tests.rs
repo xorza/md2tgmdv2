@@ -1,11 +1,11 @@
-// use md2tgmdv2::{TELEGRAM_BOT_MAX_MESSAGE_LENGTH, transform};
+use md2tgmdv2::{TELEGRAM_BOT_MAX_MESSAGE_LENGTH, transform};
 
-// fn transform_expect_1(input: &str, expected: &str) {
-//     let chunks = transform(input, TELEGRAM_BOT_MAX_MESSAGE_LENGTH);
+fn transform_expect_1(input: &str, expected: &str) {
+    let chunks = transform(input, TELEGRAM_BOT_MAX_MESSAGE_LENGTH).unwrap();
 
-//     assert_eq!(chunks.len(), 1);
-//     assert_eq!(chunks[0], expected);
-// }
+    assert_eq!(chunks.len(), 1);
+    assert_eq!(chunks[0], expected);
+}
 
 // fn transform_expect_n(input: &str, expected: &str, max_chunk_length: usize) {
 //     let chunks = transform(input, max_chunk_length);
@@ -23,15 +23,15 @@
 //     }
 // }
 
-// #[test]
-// fn preserves_single_newline() {
-//     transform_expect_1("hi\nhello", "hi\nhello");
-// }
+#[test]
+fn preserves_single_newline() {
+    transform_expect_1("hi\nhello", "hi\nhello");
+}
 
-// #[test]
-// fn preserves_double_newline() {
-//     transform_expect_1("hi\n\nhello", "hi\n\nhello");
-// }
+#[test]
+fn preserves_double_newline() {
+    transform_expect_1("hi\n\nhello", "hi\n\nhello");
+}
 
 // #[test]
 // fn converts_simple_list_item() {

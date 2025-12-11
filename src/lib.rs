@@ -8,213 +8,228 @@ use pulldown_cmark::{CodeBlockKind, Event, HeadingLevel, Options, Parser, Tag, T
 /// Telegram MarkdownV2 message hard limit.
 pub const TELEGRAM_BOT_MAX_MESSAGE_LENGTH: usize = 4096;
 
-// ---------- High level API ----------
+#[derive(Debug)]
+pub struct Converter {
+    max_len: usize,
+}
 
-/// Convert Markdown into Telegram MarkdownV2 and split into safe chunks.
-pub fn transform(markdown: &str, max_len: usize) -> anyhow::Result<Vec<String>> {
-    let parser = Parser::new_ext(markdown, Options::ENABLE_STRIKETHROUGH);
-    for event in parser {
-        match event {
-            Event::Start(tag) => {
-                start_tag(tag);
+impl Converter {
+    pub fn new(max_len: usize) -> Self {
+        Self { max_len }
+    }
+
+    /// Convert Markdown into Telegram MarkdownV2 and split into safe chunks.
+    pub fn go(&self, markdown: &str) -> anyhow::Result<Vec<String>> {
+        let parser = Parser::new_ext(markdown, Options::ENABLE_STRIKETHROUGH);
+        for event in parser {
+            match event {
+                Event::Start(tag) => {
+                    start_tag(tag);
+                }
+                Event::End(tag) => {
+                    end_tag(tag);
+                }
+                Event::Text(txt) => {
+                    println!("{}", txt);
+                }
+                Event::Code(txt) => {
+                    println!("{}", txt);
+                }
+                Event::InlineMath(txt) => {
+                    println!("{}", txt);
+                }
+                Event::DisplayMath(txt) => {
+                    println!("{}", txt);
+                }
+                Event::Html(txt) => {
+                    println!("{}", txt);
+                }
+                Event::InlineHtml(txt) => {
+                    println!("{}", txt);
+                }
+                Event::FootnoteReference(txt) => {
+                    println!("{}", txt);
+                }
+                Event::SoftBreak => {
+                    println!("SoftBreak");
+                }
+                Event::HardBreak => {
+                    println!("HardBreak");
+                }
+                Event::Rule => {
+                    println!("Rule");
+                }
+                Event::TaskListMarker(b) => {
+                    println!("TaskListMarker({})", b);
+                }
             }
-            Event::End(tag) => {
-                end_tag(tag);
+        }
+
+        Ok(vec![])
+    }
+
+    fn start_tag(&self, tag: Tag) {
+        match tag {
+            Tag::Paragraph => {
+                println!("Paragraph");
             }
-            Event::Text(txt) => {
-                println!("{}", txt);
+            Tag::Heading { level, .. } => {
+                println!("Heading");
             }
-            Event::Code(txt) => {
-                println!("{}", txt);
+            Tag::BlockQuote(kind) => {
+                println!("BlockQuote");
             }
-            Event::InlineMath(txt) => {
-                println!("{}", txt);
+            Tag::CodeBlock(_) => {
+                println!("CodeBlock");
             }
-            Event::DisplayMath(txt) => {
-                println!("{}", txt);
+            Tag::HtmlBlock => {
+                println!("HtmlBlock");
             }
-            Event::Html(txt) => {
-                println!("{}", txt);
+            Tag::List(number) => {
+                println!("List");
             }
-            Event::InlineHtml(txt) => {
-                println!("{}", txt);
+            Tag::Item => {
+                println!("Item");
             }
-            Event::FootnoteReference(txt) => {
-                println!("{}", txt);
+            Tag::FootnoteDefinition(_) => {
+                println!("FootnoteDefinition");
             }
-            Event::SoftBreak => {
-                println!("SoftBreak");
+            Tag::Table(_) => {
+                println!("Table");
             }
-            Event::HardBreak => {
-                println!("HardBreak");
+            Tag::TableHead => {
+                println!("TableHead");
             }
-            Event::Rule => {
-                println!("Rule");
+            Tag::TableRow => {
+                println!("TableRow");
             }
-            Event::TaskListMarker(b) => {
-                println!("TaskListMarker({})", b);
+            Tag::TableCell => {
+                println!("TableCell");
+            }
+            Tag::Subscript => {
+                println!("Subscript");
+            }
+            Tag::Superscript => {
+                println!("Superscript");
+            }
+            Tag::Emphasis => {
+                println!("Emphasis");
+            }
+            Tag::Strong => {
+                println!("Strong");
+            }
+            Tag::Strikethrough => {
+                println!("Strikethrough");
+            }
+            Tag::Link { .. } => {
+                println!("Link");
+            }
+            Tag::Image { .. } => {
+                println!("Image");
+            }
+            Tag::MetadataBlock(kind) => {
+                println!("MetadataBlock");
+            }
+            Tag::DefinitionList => {
+                println!("DefinitionList");
+            }
+            Tag::DefinitionListTitle => {
+                println!("DefinitionListTitle");
+            }
+            Tag::DefinitionListDefinition => {
+                println!("DefinitionListDefinition");
             }
         }
     }
 
-    Ok(vec![])
-}
-
-fn start_tag(tag: Tag) {
-    match tag {
-        Tag::Paragraph => {
-            println!("Paragraph");
-        }
-        Tag::Heading { level, .. } => {
-            println!("Heading");
-        }
-        Tag::BlockQuote(kind) => {
-            println!("BlockQuote");
-        }
-        Tag::CodeBlock(_) => {
-            println!("CodeBlock");
-        }
-        Tag::HtmlBlock => {
-            println!("HtmlBlock");
-        }
-        Tag::List(number) => {
-            println!("List");
-        }
-        Tag::Item => {
-            println!("Item");
-        }
-        Tag::FootnoteDefinition(_) => {
-            println!("FootnoteDefinition");
-        }
-        Tag::Table(_) => {
-            println!("Table");
-        }
-        Tag::TableHead => {
-            println!("TableHead");
-        }
-        Tag::TableRow => {
-            println!("TableRow");
-        }
-        Tag::TableCell => {
-            println!("TableCell");
-        }
-        Tag::Subscript => {
-            println!("Subscript");
-        }
-        Tag::Superscript => {
-            println!("Superscript");
-        }
-        Tag::Emphasis => {
-            println!("Emphasis");
-        }
-        Tag::Strong => {
-            println!("Strong");
-        }
-        Tag::Strikethrough => {
-            println!("Strikethrough");
-        }
-        Tag::Link { .. } => {
-            println!("Link");
-        }
-        Tag::Image { .. } => {
-            println!("Image");
-        }
-        Tag::MetadataBlock(kind) => {
-            println!("MetadataBlock");
-        }
-        Tag::DefinitionList => {
-            println!("DefinitionList");
-        }
-        Tag::DefinitionListTitle => {
-            println!("DefinitionListTitle");
-        }
-        Tag::DefinitionListDefinition => {
-            println!("DefinitionListDefinition");
+    fn end_tag(&self, tag: TagEnd) {
+        match tag {
+            TagEnd::Paragraph => {
+                println!("EndParagraph");
+            }
+            TagEnd::Heading(level) => {
+                println!("EndHeading");
+            }
+            TagEnd::BlockQuote(kind) => {
+                println!("EndBlockQuote");
+            }
+            TagEnd::CodeBlock => {
+                println!("EndCodeBlock");
+            }
+            TagEnd::HtmlBlock => {
+                println!("EndHtmlBlock");
+            }
+            TagEnd::List(number) => {
+                println!("EndList");
+            }
+            TagEnd::Item => {
+                println!("EndItem");
+            }
+            TagEnd::FootnoteDefinition => {
+                println!("EndFootnoteDefinition");
+            }
+            TagEnd::Table => {
+                println!("EndTable");
+            }
+            TagEnd::TableHead => {
+                println!("EndTableHead");
+            }
+            TagEnd::TableRow => {
+                println!("EndTableRow");
+            }
+            TagEnd::TableCell => {
+                println!("EndTableCell");
+            }
+            TagEnd::Subscript => {
+                println!("EndSubscript");
+            }
+            TagEnd::Superscript => {
+                println!("EndSuperscript");
+            }
+            TagEnd::Emphasis => {
+                println!("EndEmphasis");
+            }
+            TagEnd::Strong => {
+                println!("EndStrong");
+            }
+            TagEnd::Strikethrough => {
+                println!("EndStrikethrough");
+            }
+            TagEnd::Link { .. } => {
+                println!("EndLink");
+            }
+            TagEnd::Image { .. } => {
+                println!("EndImage");
+            }
+            TagEnd::MetadataBlock(kind) => {
+                println!("EndMetadataBlock");
+            }
+            TagEnd::DefinitionList => {
+                println!("EndDefinitionList");
+            }
+            TagEnd::DefinitionListTitle => {
+                println!("EndDefinitionListTitle");
+            }
+            TagEnd::DefinitionListDefinition => {
+                println!("EndDefinitionListDefinition");
+            }
         }
     }
 }
 
-fn end_tag(tag: TagEnd) {
-    match tag {
-        TagEnd::Paragraph => {
-            println!("EndParagraph");
-        }
-        TagEnd::Heading(level) => {
-            println!("EndHeading");
-        }
-        TagEnd::BlockQuote(kind) => {
-            println!("EndBlockQuote");
-        }
-        TagEnd::CodeBlock => {
-            println!("EndCodeBlock");
-        }
-        TagEnd::HtmlBlock => {
-            println!("EndHtmlBlock");
-        }
-        TagEnd::List(number) => {
-            println!("EndList");
-        }
-        TagEnd::Item => {
-            println!("EndItem");
-        }
-        TagEnd::FootnoteDefinition => {
-            println!("EndFootnoteDefinition");
-        }
-        TagEnd::Table => {
-            println!("EndTable");
-        }
-        TagEnd::TableHead => {
-            println!("EndTableHead");
-        }
-        TagEnd::TableRow => {
-            println!("EndTableRow");
-        }
-        TagEnd::TableCell => {
-            println!("EndTableCell");
-        }
-        TagEnd::Subscript => {
-            println!("EndSubscript");
-        }
-        TagEnd::Superscript => {
-            println!("EndSuperscript");
-        }
-        TagEnd::Emphasis => {
-            println!("EndEmphasis");
-        }
-        TagEnd::Strong => {
-            println!("EndStrong");
-        }
-        TagEnd::Strikethrough => {
-            println!("EndStrikethrough");
-        }
-        TagEnd::Link { .. } => {
-            println!("EndLink");
-        }
-        TagEnd::Image { .. } => {
-            println!("EndImage");
-        }
-        TagEnd::MetadataBlock(kind) => {
-            println!("EndMetadataBlock");
-        }
-        TagEnd::DefinitionList => {
-            println!("EndDefinitionList");
-        }
-        TagEnd::DefinitionListTitle => {
-            println!("EndDefinitionListTitle");
-        }
-        TagEnd::DefinitionListDefinition => {
-            println!("EndDefinitionListDefinition");
-        }
+impl Default for Converter {
+    fn default() -> Self {
+        Self::new(TELEGRAM_BOT_MAX_MESSAGE_LENGTH)
     }
 }
 
-#[test]
-fn test() -> anyhow::Result<()> {
-    let text = include_str!("../tests/1-input.md");
-    let _ = transform(text, TELEGRAM_BOT_MAX_MESSAGE_LENGTH)?;
+// #[test]
+// fn test() -> anyhow::Result<()> {
+//     let text = include_str!("../tests/1-input.md");
+//     let _ = transform(text, TELEGRAM_BOT_MAX_MESSAGE_LENGTH)?;
 
-    let text = include_str!("../tests/3-input.md");
-    let _ = transform(text, TELEGRAM_BOT_MAX_MESSAGE_LENGTH)?;
+//     let text = include_str!("../tests/3-input.md");
+//     let _ = transform(text, TELEGRAM_BOT_MAX_MESSAGE_LENGTH)?;
 
-    Ok(())
-}
+//     Ok(())
+// }
