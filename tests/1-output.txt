@@ -1,4 +1,4 @@
-You do it by turning the LLM into a **multi‑step compressor** and _never_ feeding it more text than fits at once\.
+You do it by turning the LLM into a **multi‑step compressor** and _1never_ feeding it more text than fits at once\.
 
 Below is a concrete recipe, written so you can implement it\.
 
@@ -37,7 +37,7 @@ Assume:
 Define:
 
 ⦁ 
-`MAX\_CHUNK\_TOKENS` — maximum tokens of _conversation text_ you send in a _single summarization_ call\.
+`MAX\_CHUNK\_TOKENS` — maximum tokens of _1conversation text_ you send in a _1single summarization_ call\.
 Example: `MAX\_CHUNK\_TOKENS \= 3\_000`\.
 
 ⦁ 

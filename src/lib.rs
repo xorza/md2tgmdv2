@@ -202,12 +202,12 @@ impl Converter {
             Tag::Heading { level, .. } => {
                 self.output_new_line();
                 match level {
-                    HeadingLevel::H1 => self.output("**⭐ ", false),
+                    HeadingLevel::H1 => self.output("**🌟 ", false),
                     HeadingLevel::H2 => self.output("**⭐ ", false),
-                    HeadingLevel::H3 => self.output("** ", false),
-                    HeadingLevel::H4 => self.output("** ", false),
-                    HeadingLevel::H5 => self.output(" ", false),
-                    HeadingLevel::H6 => self.output(" ", false),
+                    HeadingLevel::H3 => self.output("**✨ ", false),
+                    HeadingLevel::H4 => self.output("**🔸 ", false),
+                    HeadingLevel::H5 => self.output("_🔹 ", false),
+                    HeadingLevel::H6 => self.output("_✴️ ", false),
                 }
 
                 println!("Heading");
@@ -322,8 +322,8 @@ impl Converter {
                     HeadingLevel::H2 => self.output("**", false),
                     HeadingLevel::H3 => self.output("**", false),
                     HeadingLevel::H4 => self.output("**", false),
-                    HeadingLevel::H5 => self.output("", false),
-                    HeadingLevel::H6 => self.output("", false),
+                    HeadingLevel::H5 => self.output("_", false),
+                    HeadingLevel::H6 => self.output("_", false),
                 }
                 self.add_new_line = true;
 
