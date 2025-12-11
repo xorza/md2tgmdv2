@@ -238,20 +238,20 @@ fn preserves_blockquote_blank_line_before_heading() {
 //     transform_expect_1("## Heading\n- item", "*⭐ Heading*\n⦁ item");
 // }
 
-// #[test]
-// fn asdasd() {
-//     transform_expect_1(
-//         "some test\n\n---\n\nsome more test",
-//         "some test\n\n————————\n\nsome more test",
-//     );
-// }
-// #[test]
-// fn asdasd2() {
-//     transform_expect_1(
-//         "some test\n---\nsome more test",
-//         "*⭐ some test*\n\nsome more test",
-//     );
-// }
+#[test]
+fn asdasd() {
+    transform_expect_1(
+        "some test\n\n---\n\nsome more test",
+        "some test\n\n————————\n\nsome more test",
+    );
+}
+#[test]
+fn asdasd2() {
+    transform_expect_1(
+        "some test\n---\nsome more test",
+        "*⭐ some test*\n\nsome more test",
+    );
+}
 
 // #[test]
 // fn url_not_split_across_chunks() {

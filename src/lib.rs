@@ -301,10 +301,13 @@ impl Converter {
                     HeadingLevel::H5 => self.output("", false),
                     HeadingLevel::H6 => self.output("", false),
                 }
+                self.add_new_line = true;
 
                 println!("EndHeading");
             }
             TagEnd::BlockQuote(_) => {
+                self.add_new_line = true;
+
                 println!("EndBlockQuote");
             }
             TagEnd::CodeBlock => {
