@@ -62,57 +62,149 @@ pub fn transform(markdown: &str, max_len: usize) -> anyhow::Result<Vec<String>> 
 
 fn start_tag(tag: Tag) {
     match tag {
-        Tag::Paragraph => {}
-        Tag::Heading { level, .. } => {}
-        Tag::BlockQuote(kind) => {}
-        Tag::CodeBlock(_) => {}
-        Tag::HtmlBlock => {}
-        Tag::List(number) => {}
-        Tag::Item => {}
-        Tag::FootnoteDefinition(_) => {}
-        Tag::Table(_) => {}
-        Tag::TableHead => {}
-        Tag::TableRow => {}
-        Tag::TableCell => {}
-        Tag::Subscript => {}
-        Tag::Superscript => {}
-        Tag::Emphasis => {}
-        Tag::Strong => {}
-        Tag::Strikethrough => {}
-        Tag::Link { .. } => {}
-        Tag::Image { .. } => {}
-        Tag::MetadataBlock(kind) => {}
-        Tag::DefinitionList => {}
-        Tag::DefinitionListTitle => {}
-        Tag::DefinitionListDefinition => {}
+        Tag::Paragraph => {
+            println!("Paragraph");
+        }
+        Tag::Heading { level, .. } => {
+            println!("Heading");
+        }
+        Tag::BlockQuote(kind) => {
+            println!("BlockQuote");
+        }
+        Tag::CodeBlock(_) => {
+            println!("CodeBlock");
+        }
+        Tag::HtmlBlock => {
+            println!("HtmlBlock");
+        }
+        Tag::List(number) => {
+            println!("List");
+        }
+        Tag::Item => {
+            println!("Item");
+        }
+        Tag::FootnoteDefinition(_) => {
+            println!("FootnoteDefinition");
+        }
+        Tag::Table(_) => {
+            println!("Table");
+        }
+        Tag::TableHead => {
+            println!("TableHead");
+        }
+        Tag::TableRow => {
+            println!("TableRow");
+        }
+        Tag::TableCell => {
+            println!("TableCell");
+        }
+        Tag::Subscript => {
+            println!("Subscript");
+        }
+        Tag::Superscript => {
+            println!("Superscript");
+        }
+        Tag::Emphasis => {
+            println!("Emphasis");
+        }
+        Tag::Strong => {
+            println!("Strong");
+        }
+        Tag::Strikethrough => {
+            println!("Strikethrough");
+        }
+        Tag::Link { .. } => {
+            println!("Link");
+        }
+        Tag::Image { .. } => {
+            println!("Image");
+        }
+        Tag::MetadataBlock(kind) => {
+            println!("MetadataBlock");
+        }
+        Tag::DefinitionList => {
+            println!("DefinitionList");
+        }
+        Tag::DefinitionListTitle => {
+            println!("DefinitionListTitle");
+        }
+        Tag::DefinitionListDefinition => {
+            println!("DefinitionListDefinition");
+        }
     }
 }
 
 fn end_tag(tag: TagEnd) {
     match tag {
-        TagEnd::Paragraph => {}
-        TagEnd::Heading(level) => {}
-        TagEnd::BlockQuote(kind) => {}
-        TagEnd::CodeBlock => {}
-        TagEnd::HtmlBlock => {}
-        TagEnd::List(number) => {}
-        TagEnd::Item => {}
-        TagEnd::FootnoteDefinition => {}
-        TagEnd::Table => {}
-        TagEnd::TableHead => {}
-        TagEnd::TableRow => {}
-        TagEnd::TableCell => {}
-        TagEnd::Subscript => {}
-        TagEnd::Superscript => {}
-        TagEnd::Emphasis => {}
-        TagEnd::Strong => {}
-        TagEnd::Strikethrough => {}
-        TagEnd::Link { .. } => {}
-        TagEnd::Image { .. } => {}
-        TagEnd::MetadataBlock(kind) => {}
-        TagEnd::DefinitionList => {}
-        TagEnd::DefinitionListTitle => {}
-        TagEnd::DefinitionListDefinition => {}
+        TagEnd::Paragraph => {
+            println!("EndParagraph");
+        }
+        TagEnd::Heading(level) => {
+            println!("EndHeading");
+        }
+        TagEnd::BlockQuote(kind) => {
+            println!("EndBlockQuote");
+        }
+        TagEnd::CodeBlock => {
+            println!("EndCodeBlock");
+        }
+        TagEnd::HtmlBlock => {
+            println!("EndHtmlBlock");
+        }
+        TagEnd::List(number) => {
+            println!("EndList");
+        }
+        TagEnd::Item => {
+            println!("EndItem");
+        }
+        TagEnd::FootnoteDefinition => {
+            println!("EndFootnoteDefinition");
+        }
+        TagEnd::Table => {
+            println!("EndTable");
+        }
+        TagEnd::TableHead => {
+            println!("EndTableHead");
+        }
+        TagEnd::TableRow => {
+            println!("EndTableRow");
+        }
+        TagEnd::TableCell => {
+            println!("EndTableCell");
+        }
+        TagEnd::Subscript => {
+            println!("EndSubscript");
+        }
+        TagEnd::Superscript => {
+            println!("EndSuperscript");
+        }
+        TagEnd::Emphasis => {
+            println!("EndEmphasis");
+        }
+        TagEnd::Strong => {
+            println!("EndStrong");
+        }
+        TagEnd::Strikethrough => {
+            println!("EndStrikethrough");
+        }
+        TagEnd::Link { .. } => {
+            println!("EndLink");
+        }
+        TagEnd::Image { .. } => {
+            println!("EndImage");
+        }
+        TagEnd::MetadataBlock(kind) => {
+            println!("EndMetadataBlock");
+        }
+        TagEnd::DefinitionList => {
+            println!("EndDefinitionList");
+        }
+        TagEnd::DefinitionListTitle => {
+            println!("EndDefinitionListTitle");
+        }
+        TagEnd::DefinitionListDefinition => {
+            println!("EndDefinitionListDefinition");
+        }
     }
 }
 
