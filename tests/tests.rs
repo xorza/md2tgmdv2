@@ -89,13 +89,13 @@ fn list_after_blank_line() {
     );
 }
 
-// #[test]
-// fn preserves_code_block_language_and_escapes() {
-//     transform_expect_1(
-//         "```text\ntoken_count(text)\n```",
-//         "```text\ntoken\\_count\\(text\\)\n```",
-//     );
-// }
+#[test]
+fn preserves_code_block_language_and_escapes() {
+    transform_expect_1(
+        "```text\ntoken_count(text)\n```",
+        "```text\ntoken\\_count\\(text\\)\n```",
+    );
+}
 
 // #[test]
 // fn preserves_blockquote_blank_line() {

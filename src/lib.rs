@@ -16,26 +16,24 @@ pub const TELEGRAM_BOT_MAX_MESSAGE_LENGTH: usize = 4096;
 pub struct Converter {
     max_len: usize,
     result: Vec<String>,
-    buffer: String,
     stack: Vec<Descriptor>,
     add_new_line: bool,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum Descriptor {
     Paragraph,
-    List,
     Item,
     Strong,
     Emphasis,
+    CodeBlock(String),
 }
 
 impl Default for Converter {
     fn default() -> Self {
         Self {
             max_len: TELEGRAM_BOT_MAX_MESSAGE_LENGTH,
-            result: vec!["".to_string()],
-            buffer: String::new(),
+            result: vec![],
             stack: Vec::new(),
             add_new_line: false,
         }
@@ -59,6 +57,8 @@ impl Converter {
             return Ok(vec![]);
         }
 
+        self.result.push(String::new());
+
         let parser = Parser::new_ext(markdown, Options::ENABLE_STRIKETHROUGH);
         for event in parser {
             match event {
@@ -71,39 +71,65 @@ impl Converter {
                 Event::Text(txt) => {
                     self.output(&txt, true);
 
-                    println!("{}", txt);
+                    println!("Text");
                 }
                 Event::Code(txt) => {
                     self.output("`", false);
                     self.output(&txt, true);
                     self.output("`", false);
+
+                    println!("Code");
                 }
                 Event::InlineMath(txt) => {
+                    self.output(&txt, true);
+
                     println!("InlineMath");
                 }
                 Event::DisplayMath(txt) => {
+                    self.output(&txt, true);
+
                     println!("DisplayMath");
                 }
                 Event::Html(txt) => {
+                    self.output(&txt, true);
+
                     println!("Html");
                 }
                 Event::InlineHtml(txt) => {
+                    self.output(&txt, true);
+
                     println!("InlineHtml");
                 }
                 Event::FootnoteReference(txt) => {
+                    self.output(&txt, true);
+
                     println!("FootnoteReference");
                 }
                 Event::SoftBreak => {
-                    self.output("\n", false);
+                    self.add_new_line = true;
+
                     println!("SoftBreak");
                 }
                 Event::HardBreak => {
+                    self.add_new_line = true;
+
                     println!("HardBreak");
                 }
                 Event::Rule => {
+                    self.output_new_line();
+                    self.output("————————", true);
+                    self.add_new_line = true;
+
                     println!("Rule");
                 }
                 Event::TaskListMarker(b) => {
+                    self.output_new_line();
+                    if b {
+                        self.output("[x]", false);
+                    } else {
+                        self.output("[ ]", false);
+                    }
+
                     println!("TaskListMarker({})", b);
                 }
             }
@@ -167,7 +193,6 @@ impl Converter {
             }
             Tag::List(_) => {
                 self.output_new_line();
-                self.stack.push(Descriptor::List);
 
                 println!("List");
             }
@@ -265,8 +290,6 @@ impl Converter {
                 println!("EndHtmlBlock");
             }
             TagEnd::List(_) => {
-                self.close_descriptor(Descriptor::List)?;
-
                 println!("EndList");
             }
             TagEnd::Item => {
