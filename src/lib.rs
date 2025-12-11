@@ -20,6 +20,7 @@ pub struct Converter {
     add_new_line: bool,
     quote_level: u8,
     list: bool,
+    link_dest_url: String,
 }
 
 #[derive(Debug, Clone)]
@@ -38,6 +39,7 @@ impl Default for Converter {
             add_new_line: false,
             quote_level: 0,
             list: false,
+            link_dest_url: String::new(),
         }
     }
 }
@@ -71,7 +73,15 @@ impl Converter {
                     self.end_tag(tag)?;
                 }
                 Event::Text(txt) => {
-                    self.output(&txt, true);
+                    if self.link_dest_url.is_empty() {
+                        self.output(&txt, true);
+                    } else {
+                        let txt = escape_text(&txt);
+                        let url = escape_text(&self.link_dest_url);
+                        self.output(&format!("[{}]({})", txt, url), false);
+
+                        self.link_dest_url.clear();
+                    }
 
                     println!("Text {}", txt);
                 }
@@ -266,7 +276,11 @@ impl Converter {
             Tag::Strikethrough => {
                 println!("Strikethrough");
             }
-            Tag::Link { .. } => {
+            Tag::Link { dest_url, .. } => {
+                assert!(self.link_dest_url.is_empty());
+
+                self.link_dest_url = dest_url.to_string();
+
                 println!("Link");
             }
             Tag::Image { .. } => {
@@ -331,8 +345,6 @@ impl Converter {
                 println!("EndList");
             }
             TagEnd::Item => {
-                // self.add_new_line = true;
-
                 println!("EndItem");
             }
             TagEnd::FootnoteDefinition => {
@@ -371,10 +383,10 @@ impl Converter {
             TagEnd::Strikethrough => {
                 println!("EndStrikethrough");
             }
-            TagEnd::Link { .. } => {
+            TagEnd::Link => {
                 println!("EndLink");
             }
-            TagEnd::Image { .. } => {
+            TagEnd::Image => {
                 println!("EndImage");
             }
             TagEnd::MetadataBlock(_) => {
