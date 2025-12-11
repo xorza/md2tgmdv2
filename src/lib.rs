@@ -4,6 +4,7 @@
 //! MarkdownV2 and splits the result into chunks that fit the provided limit.
 
 use pulldown_cmark::{CodeBlockKind, Event, HeadingLevel, Options, Parser, Tag, TagEnd};
+use std::ops::Range;
 
 /// Telegram MarkdownV2 message hard limit.
 pub const TELEGRAM_BOT_MAX_MESSAGE_LENGTH: usize = 4096;
@@ -11,14 +12,26 @@ pub const TELEGRAM_BOT_MAX_MESSAGE_LENGTH: usize = 4096;
 #[derive(Debug)]
 pub struct Converter {
     max_len: usize,
+    result: Vec<String>,
     buffer: String,
+    descriptors: Vec<Descriptor>,
+}
+
+
+#[derive(Debug, PartialEq, Eq)]
+enum Descriptor {
+    Text(Range<usize>),
+    Paragraph,
+    SoftBreak,
 }
 
 impl Default for Converter {
     fn default() -> Self {
         Self {
             max_len: TELEGRAM_BOT_MAX_MESSAGE_LENGTH,
+            result: Vec::new(),
             buffer: String::new(),
+            descriptors: Vec::new(),
         }
     }
 }
@@ -32,7 +45,7 @@ impl Converter {
     }
 
     /// Convert Markdown into Telegram MarkdownV2 and split into safe chunks.
-    pub fn go(&self, markdown: &str) -> anyhow::Result<Vec<String>> {
+    pub fn go(&mut self, markdown: &str) -> anyhow::Result<Vec<String>> {
         let parser = Parser::new_ext(markdown, Options::ENABLE_STRIKETHROUGH);
         for event in parser {
             match event {
@@ -43,7 +56,10 @@ impl Converter {
                     self.end_tag(tag);
                 }
                 Event::Text(txt) => {
-                    println!("{}", txt);
+                    let escaped = self.escape_text(&txt);
+                    let range = self.buffer.len()..self.buffer.len() + escaped.len();
+                    self.buffer.push_str(&escaped);
+                    self.descriptors.push(Descriptor::Text(range));
                 }
                 Event::Code(txt) => {
                     println!("{}", txt);
@@ -64,7 +80,7 @@ impl Converter {
                     println!("{}", txt);
                 }
                 Event::SoftBreak => {
-                    println!("SoftBreak");
+                    self.descriptors.push(Descriptor::SoftBreak);
                 }
                 Event::HardBreak => {
                     println!("HardBreak");
@@ -81,10 +97,10 @@ impl Converter {
         Ok(vec![])
     }
 
-    fn start_tag(&self, tag: Tag) {
+    fn start_tag(&mut self, tag: Tag) {
         match tag {
             Tag::Paragraph => {
-                println!("Paragraph");
+                self.descriptors.push(Descriptor::Paragraph);
             }
             Tag::Heading { level, .. } => {
                 println!("Heading");
@@ -155,10 +171,10 @@ impl Converter {
         }
     }
 
-    fn end_tag(&self, tag: TagEnd) {
+    fn end_tag(&mut self, tag: TagEnd) {
         match tag {
             TagEnd::Paragraph => {
-                println!("EndParagraph");
+                self.close_descriptor(Descriptor::Paragraph);
             }
             TagEnd::Heading(level) => {
                 println!("EndHeading");
@@ -228,7 +244,37 @@ impl Converter {
             }
         }
     }
+
+    fn close_descriptor(&mut self, descriptor: Descriptor) {
+        let _last_idx = match self.descriptors.iter().rposition(|d| d == descriptor) {
+            Some(idx) => idx,
+            None => return,
+        };
+    }
+
+    fn escape_text(&self, text: &str) -> String {
+        text.replace('\\', "\\\\")
+            .replace('*', "\\*")
+            .replace('_', "\\_")
+            .replace('[', "\\[")
+            .replace(']', "\\]")
+            .replace('(', "\\(")
+            .replace(')', "\\)")
+            .replace('~', "\\~")
+            .replace('`', "\\`")
+            .replace('>', "\\>")
+            .replace('#', "\\#")
+            .replace('+', "\\+")
+            .replace('-', "\\-")
+            .replace('=', "\\=")
+            .replace('|', "\\|")
+            .replace('{', "\\{")
+            .replace('}', "\\}")
+            .replace('.', "\\.")
+            .replace('!', "\\!")
+    }
 }
+
 
 // #[test]
 // fn test() -> anyhow::Result<()> {
