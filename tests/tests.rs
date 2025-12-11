@@ -68,10 +68,10 @@ fn converts_emphasis_and_italics() {
     );
 }
 
-// #[test]
-// fn converts_heading() {
-//     transform_expect_1("## 1. What", "*⭐ 1\\. What*");
-// }
+#[test]
+fn converts_heading() {
+    transform_expect_1("## 1. What", "*⭐ 1\\. What*");
+}
 
 // #[test]
 // fn escapes_inline_code() {
