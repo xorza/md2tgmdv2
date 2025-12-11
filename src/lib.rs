@@ -18,6 +18,7 @@ pub struct Converter {
     result: Vec<String>,
     stack: Vec<Descriptor>,
     add_new_line: bool,
+    quote: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -36,6 +37,7 @@ impl Default for Converter {
             result: vec![],
             stack: Vec::new(),
             add_new_line: false,
+            quote: false,
         }
     }
 }
@@ -153,9 +155,17 @@ impl Converter {
         let last = self.result.last_mut().unwrap();
         if txt == "\n" {
             if !last.is_empty() {
+                if self.quote {
+                    last.push_str(">");
+                }
                 last.push_str("\n");
             }
-        } else if escape {
+            return;
+        }
+        if self.quote {
+            last.push_str(">");
+        }
+        if escape {
             let escaped = escape_text(&txt);
             last.push_str(&escaped);
         } else {
@@ -184,6 +194,8 @@ impl Converter {
                 println!("Heading");
             }
             Tag::BlockQuote(_) => {
+                self.quote = true;
+
                 println!("BlockQuote");
             }
             Tag::CodeBlock(kind) => {

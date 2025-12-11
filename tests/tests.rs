@@ -97,10 +97,10 @@ fn preserves_code_block_language_and_escapes() {
     );
 }
 
-// #[test]
-// fn preserves_blockquote_blank_line() {
-//     transform_expect_1("> You\n> \n> Hi", ">You\n>\n>Hi");
-// }
+#[test]
+fn preserves_blockquote_blank_line() {
+    transform_expect_1("> You\n> \n> Hi", ">You\n>\n>Hi");
+}
 
 // #[test]
 // fn converts_list_inside_blockquote() {
