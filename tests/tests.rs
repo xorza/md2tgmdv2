@@ -11,44 +11,45 @@ fn transform_expect_1(input: &str, expected: &str) {
     assert_eq!(chunks[0], expected);
 }
 
-// fn transform_expect_n(input: &str, expected: &str, max_chunk_length: usize) {
-//     let chunks = transform(input, max_chunk_length);
-//     let actual = chunks.join("===");
+#[allow(dead_code)]
+fn transform_expect_n(input: &str, expected: &str, max_chunk_length: usize) {
+    let chunks = Converter::default().go(input).unwrap();
+    let actual = chunks.join("===");
 
-//     assert_eq!(actual, expected);
-//     for (i, chunk) in chunks.iter().enumerate() {
-//         assert!(
-//             chunk.len() <= max_chunk_length,
-//             "chunk {} length {} exceeds max_chunk_length {}",
-//             i,
-//             chunk.len(),
-//             max_chunk_length
-//         );
-//     }
-// }
+    assert_eq!(actual, expected);
+    for (i, chunk) in chunks.iter().enumerate() {
+        assert!(
+            chunk.len() <= max_chunk_length,
+            "chunk {} length {} exceeds max_chunk_length {}",
+            i,
+            chunk.len(),
+            max_chunk_length
+        );
+    }
+}
 
 #[test]
-fn preserves_single_newline() {
+fn preserves_single_newline_between_lines() {
     transform_expect_1("hi\nhello", "hi\nhello");
 }
 
 #[test]
-fn preserves_double_newline() {
+fn preserves_double_blank_line() {
     transform_expect_1("hi\n\nhello", "hi\n\nhello");
 }
 
 #[test]
-fn converts_simple_list_item() {
+fn converts_bold_list_item() {
     transform_expect_1("- **Split** it into", "⦁ *Split* it into");
 }
 
 #[test]
-fn converts_text_followed_by_list() {
+fn preserves_text_before_list() {
     transform_expect_1("test\n\n- **Split** it into", "test\n\n⦁ *Split* it into");
 }
 
 #[test]
-fn escapes_parentheses() {
+fn escapes_parentheses_in_text() {
     transform_expect_1(
         "Optionally (hierarchical);",
         "Optionally \\(hierarchical\\);",
@@ -56,12 +57,12 @@ fn escapes_parentheses() {
 }
 
 #[test]
-fn escapes_trailing_period() {
+fn escapes_trailing_period_in_line() {
     transform_expect_1("the past.\n", "the past\\.");
 }
 
 #[test]
-fn converts_emphasis_and_italics() {
+fn converts_bold_and_italics() {
     transform_expect_1(
         "into a **multi‑step compressor** and *never* feeding",
         "into a *multi‑step compressor* and _never_ feeding",
@@ -69,12 +70,12 @@ fn converts_emphasis_and_italics() {
 }
 
 #[test]
-fn converts_heading() {
+fn converts_heading_to_star_heading() {
     transform_expect_1("## 1. What", "*⭐ 1\\. What*");
 }
 
 #[test]
-fn escapes_inline_code() {
+fn escapes_inline_code_markers() {
     transform_expect_1(
         "`messages = [{role: \"user\"|\"assistant\", content: string}, …]`",
         "`messages \\= \\[\\{role: \"user\"\\|\"assistant\", content: string\\}, …\\]`",
@@ -82,7 +83,7 @@ fn escapes_inline_code() {
 }
 
 #[test]
-fn list_after_blank_line() {
+fn converts_list_after_blank_line() {
     transform_expect_1(
         "Assume:\n\n\r\n- `MODEL_CONTEXT_TOKENS` = max",
         "Assume:\n\n⦁ `MODEL\\_CONTEXT\\_TOKENS` \\= max",
@@ -90,7 +91,7 @@ fn list_after_blank_line() {
 }
 
 #[test]
-fn preserves_code_block_language_and_escapes() {
+fn escapes_inside_code_block_language() {
     transform_expect_1(
         "```text\ntoken_count(text)\n```",
         "```text\ntoken\\_count\\(text\\)\n```",
@@ -98,12 +99,12 @@ fn preserves_code_block_language_and_escapes() {
 }
 
 #[test]
-fn preserves_blockquote_blank_line() {
+fn preserves_blockquote_blank_line_between_lines() {
     transform_expect_1("> You\n> \n> Hi", ">You\n>\n>Hi");
 }
 
 #[test]
-fn converts_list_inside_blockquote() {
+fn converts_list_items_inside_blockquote() {
     transform_expect_1(
         "> - Greetings\n> - Repetitive",
         ">⦁ Greetings\n>⦁ Repetitive",
@@ -135,7 +136,7 @@ fn preserves_blockquote_blank_line_before_heading() {
 }
 
 #[test]
-fn preserves_empty_lines_no_split() {
+fn preserves_blockquote_with_empty_line_without_split() {
     transform_expect_1(
         "> 1234567890\n> \n> 1234567890",
         ">1234567890\n>\n>1234567890",
@@ -143,7 +144,7 @@ fn preserves_empty_lines_no_split() {
 }
 
 #[test]
-fn text_in_angle_brackets_should_not_be_removed() {
+fn keeps_angle_bracket_text_inline() {
     transform_expect_1(
         ">hello <insert segment_summary>  ",
         ">hello <insert segment\\_summary\\>",
@@ -151,7 +152,7 @@ fn text_in_angle_brackets_should_not_be_removed() {
 }
 
 #[test]
-fn text_in_angle_brackets_should_not_be_removed1() {
+fn keeps_angle_bracket_text_on_own_line() {
     transform_expect_1(
         "> <insert segment_summary>  ",
         "><insert segment\\_summary\\>",
@@ -159,17 +160,17 @@ fn text_in_angle_brackets_should_not_be_removed1() {
 }
 
 #[test]
-fn ordered_list_items_convert() {
+fn converts_ordered_list_to_bullets() {
     transform_expect_1("1. First\n2. Second", "⦁ First\n⦁ Second");
 }
 
 #[test]
-fn nested_blockquote_preserves_levels() {
+fn preserves_nested_blockquote_levels() {
     transform_expect_1("> > Nested", ">>Nested");
 }
 
 #[test]
-fn inline_link_escapes_parens_in_url() {
+fn escapes_parentheses_in_link_url() {
     transform_expect_1(
         "[see docs](https://example.com/path(a)/page)",
         "[see docs](https://example\\.com/path\\(a\\)/page)",
@@ -177,19 +178,19 @@ fn inline_link_escapes_parens_in_url() {
 }
 
 #[test]
-fn heading_followed_by_list_no_blank_line() {
+fn heading_followed_by_list_without_blank_line() {
     transform_expect_1("## Heading\n- item", "*⭐ Heading*\n\n⦁ item");
 }
 
 #[test]
-fn asdasd() {
+fn converts_thematic_break_to_em_dash_bar() {
     transform_expect_1(
         "some test\n\n---\n\nsome more test",
         "some test\n\n————————\n\nsome more test",
     );
 }
 #[test]
-fn asdasd2() {
+fn converts_thematic_break_after_line_to_heading() {
     transform_expect_1(
         "some test\n---\nsome more test",
         "*⭐ some test*\n\nsome more test",
@@ -197,14 +198,14 @@ fn asdasd2() {
 }
 
 #[test]
-fn preserve_newlines() {
+fn preserves_newlines_around_list() {
     let input = "- text\n\nmore text";
     let expected = "⦁ text\n\nmore text";
     transform_expect_1(input, expected);
 }
 
 #[test]
-fn asd() {
+fn converts_blockquote_with_list_and_bold() {
     let input = "> - Any explicit\n>\n> **text**\n> - greetings";
     let expected = ">⦁ Any explicit\n>\n>*text*\n>\n>⦁ greetings";
     transform_expect_1(input, expected);
