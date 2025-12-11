@@ -47,26 +47,26 @@ fn converts_text_followed_by_list() {
     transform_expect_1("test\n\n- **Split** it into", "test\n\n⦁ *Split* it into");
 }
 
-// #[test]
-// fn escapes_parentheses() {
-//     transform_expect_1(
-//         "Optionally (hierarchical);",
-//         "Optionally \\(hierarchical\\);",
-//     );
-// }
+#[test]
+fn escapes_parentheses() {
+    transform_expect_1(
+        "Optionally (hierarchical);",
+        "Optionally \\(hierarchical\\);",
+    );
+}
 
-// #[test]
-// fn escapes_trailing_period() {
-//     transform_expect_1("the past.\n", "the past\\.");
-// }
+#[test]
+fn escapes_trailing_period() {
+    transform_expect_1("the past.\n", "the past\\.");
+}
 
-// #[test]
-// fn converts_emphasis_and_italics() {
-//     transform_expect_1(
-//         "into a **multi‑step compressor** and *never* feeding",
-//         "into a *multi‑step compressor* and _never_ feeding",
-//     );
-// }
+#[test]
+fn converts_emphasis_and_italics() {
+    transform_expect_1(
+        "into a **multi‑step compressor** and *never* feeding",
+        "into a *multi‑step compressor* and _never_ feeding",
+    );
+}
 
 // #[test]
 // fn converts_heading() {
