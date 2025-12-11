@@ -22,6 +22,9 @@ pub struct Converter {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Descriptor {
     Paragraph,
+    List,
+    Item,
+    Strong,
 }
 
 impl Default for Converter {
@@ -57,13 +60,13 @@ impl Converter {
         for event in parser {
             match event {
                 Event::Start(tag) => {
-                    self.start_tag(tag);
+                    self.start_tag(tag)?;
                 }
                 Event::End(tag) => {
-                    self.end_tag(tag);
+                    self.end_tag(tag)?;
                 }
                 Event::Text(txt) => {
-                    self.add_to_result(&txt);
+                    self.add_to_result(&txt, true);
                 }
                 Event::Code(txt) => {
                     println!("{}", txt);
@@ -84,7 +87,7 @@ impl Converter {
                     println!("{}", txt);
                 }
                 Event::SoftBreak => {
-                    self.add_to_result("\n");
+                    self.add_to_result("\n", false);
                 }
                 Event::HardBreak => {
                     println!("HardBreak");
@@ -105,27 +108,29 @@ impl Converter {
         Ok(std::mem::take(&mut self.result))
     }
 
-    fn add_to_result(&mut self, txt: &str) {
-        let escaped = self.escape_text(&txt);
-        self.result.last_mut().unwrap().push_str(&escaped);
+    fn add_to_result(&mut self, txt: &str, escape: bool) {
+        if escape {
+            let escaped = self.escape_text(&txt);
+            self.result.last_mut().unwrap().push_str(&escaped);
+        } else {
+            self.result.last_mut().unwrap().push_str(txt);
+        }
     }
 
     fn start_tag(&mut self, tag: Tag) -> anyhow::Result<()> {
         match tag {
             Tag::Paragraph => {
                 if matches!(self.prev_desc, Some(Descriptor::Paragraph)) {
-                    self.add_to_result("\n");
+                    self.add_to_result("\n\n", false);
+                } else if self.prev_desc.is_some() {
+                    self.add_to_result("\n", false);
                 }
                 self.stack.push(Descriptor::Paragraph);
-                if self.prev_desc.is_some() {
-                    self.add_to_result("\n");
-                }
-                self.prev_desc = None;
             }
-            Tag::Heading { level, .. } => {
+            Tag::Heading { .. } => {
                 println!("Heading");
             }
-            Tag::BlockQuote(kind) => {
+            Tag::BlockQuote(_kind) => {
                 println!("BlockQuote");
             }
             Tag::CodeBlock(_) => {
@@ -134,11 +139,12 @@ impl Converter {
             Tag::HtmlBlock => {
                 println!("HtmlBlock");
             }
-            Tag::List(number) => {
-                println!("List");
+            Tag::List(_) => {
+                self.stack.push(Descriptor::List);
             }
             Tag::Item => {
-                println!("Item");
+                self.add_to_result("⦁ ", false);
+                self.stack.push(Descriptor::Item);
             }
             Tag::FootnoteDefinition(_) => {
                 println!("FootnoteDefinition");
@@ -165,7 +171,8 @@ impl Converter {
                 println!("Emphasis");
             }
             Tag::Strong => {
-                println!("Strong");
+                self.add_to_result("*", false);
+                self.stack.push(Descriptor::Strong);
             }
             Tag::Strikethrough => {
                 println!("Strikethrough");
@@ -176,7 +183,7 @@ impl Converter {
             Tag::Image { .. } => {
                 println!("Image");
             }
-            Tag::MetadataBlock(kind) => {
+            Tag::MetadataBlock(_) => {
                 println!("MetadataBlock");
             }
             Tag::DefinitionList => {
@@ -190,6 +197,8 @@ impl Converter {
             }
         }
 
+        self.prev_desc = None;
+
         Ok(())
     }
 
@@ -198,10 +207,10 @@ impl Converter {
             TagEnd::Paragraph => {
                 self.close_descriptor(Descriptor::Paragraph)?;
             }
-            TagEnd::Heading(level) => {
+            TagEnd::Heading(_) => {
                 println!("EndHeading");
             }
-            TagEnd::BlockQuote(kind) => {
+            TagEnd::BlockQuote(_) => {
                 println!("EndBlockQuote");
             }
             TagEnd::CodeBlock => {
@@ -210,11 +219,11 @@ impl Converter {
             TagEnd::HtmlBlock => {
                 println!("EndHtmlBlock");
             }
-            TagEnd::List(number) => {
-                println!("EndList");
+            TagEnd::List(_) => {
+                self.close_descriptor(Descriptor::List)?;
             }
             TagEnd::Item => {
-                println!("EndItem");
+                self.close_descriptor(Descriptor::Item)?;
             }
             TagEnd::FootnoteDefinition => {
                 println!("EndFootnoteDefinition");
@@ -241,7 +250,7 @@ impl Converter {
                 println!("EndEmphasis");
             }
             TagEnd::Strong => {
-                println!("EndStrong");
+                self.close_descriptor(Descriptor::Strong)?;
             }
             TagEnd::Strikethrough => {
                 println!("EndStrikethrough");
@@ -252,7 +261,7 @@ impl Converter {
             TagEnd::Image { .. } => {
                 println!("EndImage");
             }
-            TagEnd::MetadataBlock(kind) => {
+            TagEnd::MetadataBlock(_) => {
                 println!("EndMetadataBlock");
             }
             TagEnd::DefinitionList => {
@@ -269,15 +278,21 @@ impl Converter {
         Ok(())
     }
 
+    fn get_last_descriptor(&self) -> Descriptor {
+        self.stack.last().expect("Unexpected end tag").clone()
+    }
+
     fn close_descriptor(&mut self, descriptor: Descriptor) -> anyhow::Result<()> {
         self.prev_desc = Some(descriptor);
-        let last = self.stack.pop();
-        if last.is_none() {
-            return Err(anyhow!("Unexpected end tag"));
-        }
-        let last = last.unwrap();
-        if last != descriptor {
-            return Err(anyhow!("Unexpected end tag"));
+        let last = self.stack.pop().expect("Unexpected end tag");
+
+        assert_eq!(last, descriptor, "Unexpected end tag");
+
+        match descriptor {
+            Descriptor::Strong => {
+                self.add_to_result("*", false);
+            }
+            _ => {}
         }
 
         Ok(())

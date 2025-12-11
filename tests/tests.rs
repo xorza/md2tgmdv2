@@ -35,10 +35,10 @@ fn preserves_double_newline() {
     transform_expect_1("hi\n\nhello", "hi\n\nhello");
 }
 
-// #[test]
-// fn converts_simple_list_item() {
-//     transform_expect_1("- **Split** it into", "⦁ *Split* it into");
-// }
+#[test]
+fn converts_simple_list_item() {
+    transform_expect_1("- **Split** it into", "⦁ *Split* it into");
+}
 
 // #[test]
 // fn converts_text_followed_by_list() {
