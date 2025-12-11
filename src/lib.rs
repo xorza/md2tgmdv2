@@ -19,12 +19,11 @@ pub struct Converter {
     stack: Vec<Descriptor>,
     add_new_line: bool,
     quote: bool,
+    list: bool,
 }
 
 #[derive(Debug, Clone)]
 enum Descriptor {
-    Paragraph,
-    Item,
     Strong,
     Emphasis,
     CodeBlock(String),
@@ -38,6 +37,7 @@ impl Default for Converter {
             stack: Vec::new(),
             add_new_line: false,
             quote: false,
+            list: false,
         }
     }
 }
@@ -148,23 +148,26 @@ impl Converter {
         self.output("\n", false);
     }
     fn output(&mut self, txt: &str, escape: bool) {
+        let last = self.result.last_mut().unwrap();
+
         if self.add_new_line {
-            self.result.last_mut().unwrap().push_str("\n");
+            last.push_str("\n");
+            if self.quote {
+                last.push_str(">");
+            }
             self.add_new_line = false;
         }
-        let last = self.result.last_mut().unwrap();
+
         if txt == "\n" {
             if !last.is_empty() {
-                if self.quote {
-                    last.push_str(">");
-                }
                 last.push_str("\n");
+            }
+            if self.quote {
+                last.push_str(">");
             }
             return;
         }
-        if self.quote {
-            last.push_str(">");
-        }
+
         if escape {
             let escaped = escape_text(&txt);
             last.push_str(&escaped);
@@ -177,7 +180,6 @@ impl Converter {
         match tag {
             Tag::Paragraph => {
                 self.output_new_line();
-                self.stack.push(Descriptor::Paragraph);
 
                 println!("Paragraph");
             }
@@ -214,13 +216,13 @@ impl Converter {
                 println!("HtmlBlock");
             }
             Tag::List(_) => {
-                self.output_new_line();
+                self.list = true;
 
                 println!("List");
             }
             Tag::Item => {
+                self.output_new_line();
                 self.output("⦁ ", false);
-                self.stack.push(Descriptor::Item);
 
                 println!("Item");
             }
@@ -287,7 +289,6 @@ impl Converter {
         match tag {
             TagEnd::Paragraph => {
                 self.add_new_line = true;
-                self.close_descriptor(Descriptor::Paragraph)?;
 
                 println!("EndParagraph");
             }
@@ -300,6 +301,7 @@ impl Converter {
                     HeadingLevel::H5 => self.output("", false),
                     HeadingLevel::H6 => self.output("", false),
                 }
+
                 println!("EndHeading");
             }
             TagEnd::BlockQuote(_) => {
@@ -316,11 +318,12 @@ impl Converter {
                 println!("EndHtmlBlock");
             }
             TagEnd::List(_) => {
+                self.list = false;
+
                 println!("EndList");
             }
             TagEnd::Item => {
-                self.add_new_line = true;
-                self.close_descriptor(Descriptor::Item)?;
+                // self.add_new_line = true;
 
                 println!("EndItem");
             }
@@ -413,8 +416,6 @@ fn escape_text(text: &str) -> String {
 impl PartialEq for Descriptor {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Descriptor::Paragraph, Descriptor::Paragraph) => true,
-            (Descriptor::Item, Descriptor::Item) => true,
             (Descriptor::Strong, Descriptor::Strong) => true,
             (Descriptor::Emphasis, Descriptor::Emphasis) => true,
             (Descriptor::CodeBlock(_), Descriptor::CodeBlock(_)) => true,

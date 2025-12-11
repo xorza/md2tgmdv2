@@ -102,13 +102,13 @@ fn preserves_blockquote_blank_line() {
     transform_expect_1("> You\n> \n> Hi", ">You\n>\n>Hi");
 }
 
-// #[test]
-// fn converts_list_inside_blockquote() {
-//     transform_expect_1(
-//         "> - Greetings\n> - Repetitive",
-//         ">⦁ Greetings\n>⦁ Repetitive",
-//     );
-// }
+#[test]
+fn converts_list_inside_blockquote() {
+    transform_expect_1(
+        "> - Greetings\n> - Repetitive",
+        ">⦁ Greetings\n>⦁ Repetitive",
+    );
+}
 
 // #[test]
 // fn converts_bold_inside_blockquote() {
