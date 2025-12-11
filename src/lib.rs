@@ -28,6 +28,7 @@ enum Descriptor {
     Strong,
     Emphasis,
     CodeBlock(String),
+    Strikethrough,
 }
 
 impl Default for Converter {
@@ -200,12 +201,12 @@ impl Converter {
             Tag::Heading { level, .. } => {
                 self.output_new_line();
                 match level {
-                    HeadingLevel::H1 => self.output("*⭐⭐ ", false),
-                    HeadingLevel::H2 => self.output("*⭐ ", false),
-                    HeadingLevel::H3 => self.output("*", false),
-                    HeadingLevel::H4 => self.output("*", false),
-                    HeadingLevel::H5 => self.output("", false),
-                    HeadingLevel::H6 => self.output("", false),
+                    HeadingLevel::H1 => self.output("**⭐ ", false),
+                    HeadingLevel::H2 => self.output("**⭐ ", false),
+                    HeadingLevel::H3 => self.output("** ", false),
+                    HeadingLevel::H4 => self.output("** ", false),
+                    HeadingLevel::H5 => self.output(" ", false),
+                    HeadingLevel::H6 => self.output(" ", false),
                 }
 
                 println!("Heading");
@@ -269,12 +270,15 @@ impl Converter {
                 println!("Emphasis");
             }
             Tag::Strong => {
-                self.output("*", false);
+                self.output("**", false);
                 self.stack.push(Descriptor::Strong);
 
                 println!("Strong");
             }
             Tag::Strikethrough => {
+                self.output("~~", false);
+                self.stack.push(Descriptor::Strikethrough);
+
                 println!("Strikethrough");
             }
             Tag::Link { dest_url, .. } => {
@@ -313,10 +317,10 @@ impl Converter {
             }
             TagEnd::Heading(level) => {
                 match level {
-                    HeadingLevel::H1 => self.output("*", false),
-                    HeadingLevel::H2 => self.output("*", false),
-                    HeadingLevel::H3 => self.output("*", false),
-                    HeadingLevel::H4 => self.output("*", false),
+                    HeadingLevel::H1 => self.output("**", false),
+                    HeadingLevel::H2 => self.output("**", false),
+                    HeadingLevel::H3 => self.output("**", false),
+                    HeadingLevel::H4 => self.output("**", false),
                     HeadingLevel::H5 => self.output("", false),
                     HeadingLevel::H6 => self.output("", false),
                 }
@@ -377,13 +381,14 @@ impl Converter {
                 println!("EndEmphasis");
             }
             TagEnd::Strong => {
-                self.output("*", false);
+                self.output("**", false);
                 self.close_descriptor(Descriptor::Strong)?;
 
                 println!("EndStrong");
             }
             TagEnd::Strikethrough => {
-                println!("EndStrikethrough");
+                self.output("~~", false);
+                self.close_descriptor(Descriptor::Strikethrough)?;
             }
             TagEnd::Link => {
                 println!("EndLink");
