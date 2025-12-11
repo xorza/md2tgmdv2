@@ -1,3 +1,5 @@
+#![allow(unused_imports)]
+
 use md2tgmdv2::{Converter, TELEGRAM_BOT_MAX_MESSAGE_LENGTH};
 
 fn transform_expect_1(input: &str, expected: &str) {
@@ -40,10 +42,10 @@ fn converts_simple_list_item() {
     transform_expect_1("- **Split** it into", "⦁ *Split* it into");
 }
 
-// #[test]
-// fn converts_text_followed_by_list() {
-//     transform_expect_1("test\n\n- **Split** it into", "test\n\n⦁ *Split* it into");
-// }
+#[test]
+fn converts_text_followed_by_list() {
+    transform_expect_1("test\n\n- **Split** it into", "test\n\n⦁ *Split* it into");
+}
 
 // #[test]
 // fn escapes_parentheses() {

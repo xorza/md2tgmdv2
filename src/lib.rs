@@ -3,6 +3,8 @@
 //! Public entry point is [`transform`]. It renders Markdown into Telegram‑safe
 //! MarkdownV2 and splits the result into chunks that fit the provided limit.
 
+#![allow(unused_imports)]
+
 use anyhow::anyhow;
 use pulldown_cmark::{CodeBlockKind, Event, HeadingLevel, Options, Parser, Tag, TagEnd};
 use std::ops::Range;
@@ -16,7 +18,7 @@ pub struct Converter {
     result: Vec<String>,
     buffer: String,
     stack: Vec<Descriptor>,
-    prev_desc: Option<Descriptor>,
+    add_new_line: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -34,7 +36,7 @@ impl Default for Converter {
             result: vec!["".to_string()],
             buffer: String::new(),
             stack: Vec::new(),
-            prev_desc: None,
+            add_new_line: false,
         }
     }
 }
@@ -88,6 +90,7 @@ impl Converter {
                 }
                 Event::SoftBreak => {
                     self.add_to_result("\n", false);
+                    println!("SoftBreak");
                 }
                 Event::HardBreak => {
                     println!("HardBreak");
@@ -109,23 +112,34 @@ impl Converter {
     }
 
     fn add_to_result(&mut self, txt: &str, escape: bool) {
-        if escape {
-            let escaped = self.escape_text(&txt);
-            self.result.last_mut().unwrap().push_str(&escaped);
+        if self.add_new_line {
+            self.result.last_mut().unwrap().push_str("\n");
+            self.add_new_line = false;
+        }
+        let last = self.result.last_mut().unwrap();
+        if txt == "\n" {
+            if !last.is_empty() {
+                last.push_str("\n");
+            }
+        } else if escape {
+            let escaped = escape_text(&txt);
+            last.push_str(&escaped);
         } else {
-            self.result.last_mut().unwrap().push_str(txt);
+            last.push_str(txt);
         }
     }
 
     fn start_tag(&mut self, tag: Tag) -> anyhow::Result<()> {
+        // if matches!(self.prev_desc, Some(Descriptor::Paragraph)) {
+        //     self.add_to_result("\n", false);
+        // }
+
         match tag {
             Tag::Paragraph => {
-                if matches!(self.prev_desc, Some(Descriptor::Paragraph)) {
-                    self.add_to_result("\n\n", false);
-                } else if self.prev_desc.is_some() {
-                    self.add_to_result("\n", false);
-                }
+                self.add_to_result("\n", false);
                 self.stack.push(Descriptor::Paragraph);
+
+                println!("Paragraph");
             }
             Tag::Heading { .. } => {
                 println!("Heading");
@@ -141,10 +155,15 @@ impl Converter {
             }
             Tag::List(_) => {
                 self.stack.push(Descriptor::List);
+
+                println!("List");
             }
             Tag::Item => {
+                self.add_to_result("\n", false);
                 self.add_to_result("⦁ ", false);
                 self.stack.push(Descriptor::Item);
+
+                println!("Item");
             }
             Tag::FootnoteDefinition(_) => {
                 println!("FootnoteDefinition");
@@ -173,6 +192,7 @@ impl Converter {
             Tag::Strong => {
                 self.add_to_result("*", false);
                 self.stack.push(Descriptor::Strong);
+                println!("Strong");
             }
             Tag::Strikethrough => {
                 println!("Strikethrough");
@@ -197,14 +217,13 @@ impl Converter {
             }
         }
 
-        self.prev_desc = None;
-
         Ok(())
     }
 
     fn end_tag(&mut self, tag: TagEnd) -> anyhow::Result<()> {
         match tag {
             TagEnd::Paragraph => {
+                println!("EndParagraph");
                 self.close_descriptor(Descriptor::Paragraph)?;
             }
             TagEnd::Heading(_) => {
@@ -220,9 +239,11 @@ impl Converter {
                 println!("EndHtmlBlock");
             }
             TagEnd::List(_) => {
+                println!("EndList");
                 self.close_descriptor(Descriptor::List)?;
             }
             TagEnd::Item => {
+                println!("EndItem");
                 self.close_descriptor(Descriptor::Item)?;
             }
             TagEnd::FootnoteDefinition => {
@@ -250,6 +271,7 @@ impl Converter {
                 println!("EndEmphasis");
             }
             TagEnd::Strong => {
+                println!("EndStrong");
                 self.close_descriptor(Descriptor::Strong)?;
             }
             TagEnd::Strikethrough => {
@@ -283,12 +305,13 @@ impl Converter {
     }
 
     fn close_descriptor(&mut self, descriptor: Descriptor) -> anyhow::Result<()> {
-        self.prev_desc = Some(descriptor);
         let last = self.stack.pop().expect("Unexpected end tag");
-
         assert_eq!(last, descriptor, "Unexpected end tag");
 
         match descriptor {
+            Descriptor::Paragraph => {
+                self.add_new_line = true;
+            }
             Descriptor::Strong => {
                 self.add_to_result("*", false);
             }
@@ -297,30 +320,28 @@ impl Converter {
 
         Ok(())
     }
-
-    fn escape_text(&self, text: &str) -> String {
-        text.replace('\\', "\\\\")
-            .replace('*', "\\*")
-            .replace('_', "\\_")
-            .replace('[', "\\[")
-            .replace(']', "\\]")
-            .replace('(', "\\(")
-            .replace(')', "\\)")
-            .replace('~', "\\~")
-            .replace('`', "\\`")
-            .replace('>', "\\>")
-            .replace('#', "\\#")
-            .replace('+', "\\+")
-            .replace('-', "\\-")
-            .replace('=', "\\=")
-            .replace('|', "\\|")
-            .replace('{', "\\{")
-            .replace('}', "\\}")
-            .replace('.', "\\.")
-            .replace('!', "\\!")
-    }
 }
-
+fn escape_text(text: &str) -> String {
+    text.replace('\\', "\\\\")
+        .replace('*', "\\*")
+        .replace('_', "\\_")
+        .replace('[', "\\[")
+        .replace(']', "\\]")
+        .replace('(', "\\(")
+        .replace(')', "\\)")
+        .replace('~', "\\~")
+        .replace('`', "\\`")
+        .replace('>', "\\>")
+        .replace('#', "\\#")
+        .replace('+', "\\+")
+        .replace('-', "\\-")
+        .replace('=', "\\=")
+        .replace('|', "\\|")
+        .replace('{', "\\{")
+        .replace('}', "\\}")
+        .replace('.', "\\.")
+        .replace('!', "\\!")
+}
 // #[test]
 // fn test() -> anyhow::Result<()> {
 //     let text = include_str!("../tests/1-input.md");
