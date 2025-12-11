@@ -111,7 +111,9 @@ impl Converter {
 
         Ok(std::mem::take(&mut self.result))
     }
-
+    fn start_new_line(&mut self) {
+        self.add_to_result("\n", false);
+    }
     fn add_to_result(&mut self, txt: &str, escape: bool) {
         if self.add_new_line {
             self.result.last_mut().unwrap().push_str("\n");
@@ -133,15 +135,23 @@ impl Converter {
     fn start_tag(&mut self, tag: Tag) -> anyhow::Result<()> {
         match tag {
             Tag::Paragraph => {
-                self.add_to_result("\n", false);
+                self.start_new_line();
                 self.stack.push(Descriptor::Paragraph);
 
                 println!("Paragraph");
             }
-            Tag::Heading { .. } => {
+            Tag::Heading { level, .. } => {
+                match level {
+                    HeadingLevel::H1 => self.add_to_result("*⭐⭐ ", false),
+                    HeadingLevel::H2 => self.add_to_result("*⭐ ", false),
+                    HeadingLevel::H3 => self.add_to_result("*", false),
+                    HeadingLevel::H4 => self.add_to_result("*", false),
+                    HeadingLevel::H5 => self.add_to_result("", false),
+                    HeadingLevel::H6 => self.add_to_result("", false),
+                }
                 println!("Heading");
             }
-            Tag::BlockQuote(_kind) => {
+            Tag::BlockQuote(_) => {
                 println!("BlockQuote");
             }
             Tag::CodeBlock(_) => {
@@ -156,7 +166,7 @@ impl Converter {
                 println!("List");
             }
             Tag::Item => {
-                self.add_to_result("\n", false);
+                self.start_new_line();
                 self.add_to_result("⦁ ", false);
                 self.stack.push(Descriptor::Item);
 
@@ -226,7 +236,15 @@ impl Converter {
                 self.add_new_line = true;
                 self.close_descriptor(Descriptor::Paragraph)?;
             }
-            TagEnd::Heading(_) => {
+            TagEnd::Heading(level) => {
+                match level {
+                    HeadingLevel::H1 => self.add_to_result("*", false),
+                    HeadingLevel::H2 => self.add_to_result("*", false),
+                    HeadingLevel::H3 => self.add_to_result("*", false),
+                    HeadingLevel::H4 => self.add_to_result("*", false),
+                    HeadingLevel::H5 => self.add_to_result("", false),
+                    HeadingLevel::H6 => self.add_to_result("", false),
+                }
                 println!("EndHeading");
             }
             TagEnd::BlockQuote(_) => {
