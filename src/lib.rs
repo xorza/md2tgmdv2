@@ -71,7 +71,7 @@ impl Converter {
                 Event::Text(txt) => {
                     self.output(&txt, true);
 
-                    println!("Text");
+                    println!("Text {}", txt);
                 }
                 Event::Code(txt) => {
                     self.output("`", false);
@@ -193,6 +193,7 @@ impl Converter {
                 };
                 self.output("```", false);
                 self.output(&lang, false);
+                self.add_new_line = true;
                 self.stack.push(Descriptor::CodeBlock(lang));
 
                 println!("CodeBlock");
