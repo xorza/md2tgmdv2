@@ -70,6 +70,8 @@ impl Converter {
                 }
                 Event::Text(txt) => {
                     self.output(&txt, true);
+
+                    println!("{}", txt);
                 }
                 Event::Code(txt) => {
                     self.output("`", false);
@@ -151,6 +153,7 @@ impl Converter {
                     HeadingLevel::H5 => self.output("", false),
                     HeadingLevel::H6 => self.output("", false),
                 }
+
                 println!("Heading");
             }
             Tag::BlockQuote(_) => {
@@ -163,12 +166,12 @@ impl Converter {
                 println!("HtmlBlock");
             }
             Tag::List(_) => {
+                self.output_new_line();
                 self.stack.push(Descriptor::List);
 
                 println!("List");
             }
             Tag::Item => {
-                self.output_new_line();
                 self.output("⦁ ", false);
                 self.stack.push(Descriptor::Item);
 
@@ -198,11 +201,13 @@ impl Converter {
             Tag::Emphasis => {
                 self.output("_", false);
                 self.stack.push(Descriptor::Emphasis);
+
                 println!("Emphasis");
             }
             Tag::Strong => {
                 self.output("*", false);
                 self.stack.push(Descriptor::Strong);
+
                 println!("Strong");
             }
             Tag::Strikethrough => {
@@ -234,9 +239,10 @@ impl Converter {
     fn end_tag(&mut self, tag: TagEnd) -> anyhow::Result<()> {
         match tag {
             TagEnd::Paragraph => {
-                println!("EndParagraph");
                 self.add_new_line = true;
                 self.close_descriptor(Descriptor::Paragraph)?;
+
+                println!("EndParagraph");
             }
             TagEnd::Heading(level) => {
                 match level {
@@ -259,12 +265,15 @@ impl Converter {
                 println!("EndHtmlBlock");
             }
             TagEnd::List(_) => {
-                println!("EndList");
                 self.close_descriptor(Descriptor::List)?;
+
+                println!("EndList");
             }
             TagEnd::Item => {
-                println!("EndItem");
+                self.add_new_line = true;
                 self.close_descriptor(Descriptor::Item)?;
+
+                println!("EndItem");
             }
             TagEnd::FootnoteDefinition => {
                 println!("EndFootnoteDefinition");
@@ -288,14 +297,16 @@ impl Converter {
                 println!("EndSuperscript");
             }
             TagEnd::Emphasis => {
-                println!("EndEmphasis");
                 self.output("_", false);
                 self.close_descriptor(Descriptor::Emphasis)?;
+
+                println!("EndEmphasis");
             }
             TagEnd::Strong => {
-                println!("EndStrong");
                 self.output("*", false);
                 self.close_descriptor(Descriptor::Strong)?;
+
+                println!("EndStrong");
             }
             TagEnd::Strikethrough => {
                 println!("EndStrikethrough");

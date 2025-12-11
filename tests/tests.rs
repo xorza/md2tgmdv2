@@ -81,21 +81,13 @@ fn escapes_inline_code() {
     );
 }
 
-// #[test]
-// fn list_after_blank_line() {
-//     transform_expect_1(
-//         "Assume:\n\n- `MODEL_CONTEXT_TOKENS` = max",
-//         "Assume:\n\n⦁ `MODEL\\_CONTEXT\\_TOKENS` \\= max",
-//     );
-// }
-
-// #[test]
-// fn list_without_blank_line() {
-//     transform_expect_1(
-//         "Assume:\n- `MODEL_CONTEXT_TOKENS` = max",
-//         "Assume:\n⦁ `MODEL\\_CONTEXT\\_TOKENS` \\= max",
-//     );
-// }
+#[test]
+fn list_after_blank_line() {
+    transform_expect_1(
+        "Assume:\n\n\r\n- `MODEL_CONTEXT_TOKENS` = max",
+        "Assume:\n\n⦁ `MODEL\\_CONTEXT\\_TOKENS` \\= max",
+    );
+}
 
 // #[test]
 // fn preserves_code_block_language_and_escapes() {
