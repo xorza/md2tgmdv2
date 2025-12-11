@@ -16,13 +16,12 @@ pub struct Converter {
     result: Vec<String>,
     buffer: String,
     stack: Vec<Descriptor>,
-    prev_descriptor: Option<Descriptor>,
+    prev_desc: Option<Descriptor>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 enum Descriptor {
     Paragraph,
-    Text(Range<usize>),
 }
 
 impl Default for Converter {
@@ -32,7 +31,7 @@ impl Default for Converter {
             result: vec!["".to_string()],
             buffer: String::new(),
             stack: Vec::new(),
-            prev_descriptor: None,
+            prev_desc: None,
         }
     }
 }
@@ -64,7 +63,7 @@ impl Converter {
                     self.end_tag(tag);
                 }
                 Event::Text(txt) => {
-                    self.add_to_buffer(&txt);
+                    self.add_to_result(&txt);
                 }
                 Event::Code(txt) => {
                     println!("{}", txt);
@@ -84,7 +83,9 @@ impl Converter {
                 Event::FootnoteReference(txt) => {
                     println!("{}", txt);
                 }
-                Event::SoftBreak => {}
+                Event::SoftBreak => {
+                    self.add_to_result("\n");
+                }
                 Event::HardBreak => {
                     println!("HardBreak");
                 }
@@ -97,25 +98,24 @@ impl Converter {
             }
         }
 
-        println!("{:?}", self.stack);
+        if !self.stack.is_empty() {
+            return Err(anyhow!("Unbalanced tags"));
+        }
 
-        Ok(vec![])
+        Ok(std::mem::take(&mut self.result))
     }
 
-    fn add_to_buffer(&mut self, txt: &str) {
-        let escaped = self.escape_text(&txt);
-        let range = self.buffer.len()..self.buffer.len() + escaped.len();
-        self.buffer.push_str(&escaped);
-        self.stack.push(Descriptor::Text(range));
-    }
     fn add_to_result(&mut self, txt: &str) {
-        self.result.last_mut().unwrap().push_str(txt);
+        let escaped = self.escape_text(&txt);
+        self.result.last_mut().unwrap().push_str(&escaped);
     }
 
-    fn start_tag(&mut self, tag: Tag) {
+    fn start_tag(&mut self, tag: Tag) -> anyhow::Result<()> {
         match tag {
             Tag::Paragraph => {
-                self.stack.push(Descriptor::Paragraph);
+                if self.prev_desc.is_some() {
+                    self.add_to_result("\n");
+                }
             }
             Tag::Heading { level, .. } => {
                 println!("Heading");
@@ -184,12 +184,14 @@ impl Converter {
                 println!("DefinitionListDefinition");
             }
         }
+
+        Ok(())
     }
 
-    fn end_tag(&mut self, tag: TagEnd) {
+    fn end_tag(&mut self, tag: TagEnd) -> anyhow::Result<()> {
         match tag {
             TagEnd::Paragraph => {
-                self.close_descriptor(Descriptor::Paragraph);
+                self.close_descriptor(Descriptor::Paragraph)?;
             }
             TagEnd::Heading(level) => {
                 println!("EndHeading");
@@ -258,18 +260,12 @@ impl Converter {
                 println!("EndDefinitionListDefinition");
             }
         }
+
+        Ok(())
     }
 
     fn close_descriptor(&mut self, descriptor: Descriptor) -> anyhow::Result<()> {
-        assert!(
-            matches!(descriptor, Descriptor::Text(_)),
-            "Unexpected descriptor"
-        );
-
-        let last = self
-            .stack
-            .pop()
-            .ok_or(anyhow!("Opening descriptor not found"))?;
+        self.prev_desc = Some(descriptor);
 
         Ok(())
     }

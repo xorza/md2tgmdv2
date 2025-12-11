@@ -3,6 +3,8 @@ use md2tgmdv2::{Converter, TELEGRAM_BOT_MAX_MESSAGE_LENGTH};
 fn transform_expect_1(input: &str, expected: &str) {
     let chunks = Converter::default().go(input).unwrap();
 
+    println!("chunks: {:?}", chunks);
+
     assert_eq!(chunks.len(), 1);
     assert_eq!(chunks[0], expected);
 }
