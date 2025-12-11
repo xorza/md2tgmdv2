@@ -3,6 +3,7 @@
 //! Public entry point is [`transform`]. It renders Markdown into Telegram‑safe
 //! MarkdownV2 and splits the result into chunks that fit the provided limit.
 
+use anyhow::anyhow;
 use pulldown_cmark::{CodeBlockKind, Event, HeadingLevel, Options, Parser, Tag, TagEnd};
 use std::ops::Range;
 
@@ -14,24 +15,24 @@ pub struct Converter {
     max_len: usize,
     result: Vec<String>,
     buffer: String,
-    descriptors: Vec<Descriptor>,
+    stack: Vec<Descriptor>,
+    prev_descriptor: Option<Descriptor>,
 }
 
-
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug)]
 enum Descriptor {
-    Text(Range<usize>),
     Paragraph,
-    SoftBreak,
+    Text(Range<usize>),
 }
 
 impl Default for Converter {
     fn default() -> Self {
         Self {
             max_len: TELEGRAM_BOT_MAX_MESSAGE_LENGTH,
-            result: Vec::new(),
+            result: vec!["".to_string()],
             buffer: String::new(),
-            descriptors: Vec::new(),
+            stack: Vec::new(),
+            prev_descriptor: None,
         }
     }
 }
@@ -46,6 +47,13 @@ impl Converter {
 
     /// Convert Markdown into Telegram MarkdownV2 and split into safe chunks.
     pub fn go(&mut self, markdown: &str) -> anyhow::Result<Vec<String>> {
+        *self = Self::new(self.max_len);
+
+        let markdown = markdown.trim();
+        if markdown.is_empty() {
+            return Ok(vec![]);
+        }
+
         let parser = Parser::new_ext(markdown, Options::ENABLE_STRIKETHROUGH);
         for event in parser {
             match event {
@@ -56,10 +64,7 @@ impl Converter {
                     self.end_tag(tag);
                 }
                 Event::Text(txt) => {
-                    let escaped = self.escape_text(&txt);
-                    let range = self.buffer.len()..self.buffer.len() + escaped.len();
-                    self.buffer.push_str(&escaped);
-                    self.descriptors.push(Descriptor::Text(range));
+                    self.add_to_buffer(&txt);
                 }
                 Event::Code(txt) => {
                     println!("{}", txt);
@@ -79,9 +84,7 @@ impl Converter {
                 Event::FootnoteReference(txt) => {
                     println!("{}", txt);
                 }
-                Event::SoftBreak => {
-                    self.descriptors.push(Descriptor::SoftBreak);
-                }
+                Event::SoftBreak => {}
                 Event::HardBreak => {
                     println!("HardBreak");
                 }
@@ -94,13 +97,25 @@ impl Converter {
             }
         }
 
+        println!("{:?}", self.stack);
+
         Ok(vec![])
+    }
+
+    fn add_to_buffer(&mut self, txt: &str) {
+        let escaped = self.escape_text(&txt);
+        let range = self.buffer.len()..self.buffer.len() + escaped.len();
+        self.buffer.push_str(&escaped);
+        self.stack.push(Descriptor::Text(range));
+    }
+    fn add_to_result(&mut self, txt: &str) {
+        self.result.last_mut().unwrap().push_str(txt);
     }
 
     fn start_tag(&mut self, tag: Tag) {
         match tag {
             Tag::Paragraph => {
-                self.descriptors.push(Descriptor::Paragraph);
+                self.stack.push(Descriptor::Paragraph);
             }
             Tag::Heading { level, .. } => {
                 println!("Heading");
@@ -245,11 +260,18 @@ impl Converter {
         }
     }
 
-    fn close_descriptor(&mut self, descriptor: Descriptor) {
-        let _last_idx = match self.descriptors.iter().rposition(|d| d == descriptor) {
-            Some(idx) => idx,
-            None => return,
-        };
+    fn close_descriptor(&mut self, descriptor: Descriptor) -> anyhow::Result<()> {
+        assert!(
+            matches!(descriptor, Descriptor::Text(_)),
+            "Unexpected descriptor"
+        );
+
+        let last = self
+            .stack
+            .pop()
+            .ok_or(anyhow!("Opening descriptor not found"))?;
+
+        Ok(())
     }
 
     fn escape_text(&self, text: &str) -> String {
@@ -274,7 +296,6 @@ impl Converter {
             .replace('!', "\\!")
     }
 }
-
 
 // #[test]
 // fn test() -> anyhow::Result<()> {
