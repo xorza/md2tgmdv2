@@ -260,19 +260,19 @@ fn asdasd2() {
 //     transform_expect_n(input, expected, 80);
 // }
 
-// #[test]
-// fn preserve_newlines() {
-//     let input = "- text\n\nmore text";
-//     let expected = "⦁ text\n\nmore text";
-//     transform_expect_1(input, expected);
-// }
+#[test]
+fn preserve_newlines() {
+    let input = "- text\n\nmore text";
+    let expected = "⦁ text\n\nmore text";
+    transform_expect_1(input, expected);
+}
 
-// #[test]
-// fn asd() {
-//     let input = "> - Any explicit\n>\n> **text**\n> - greetings";
-//     let expected = ">⦁ Any explicit\n>\n>*text*\n>⦁ greetings";
-//     transform_expect_1(input, expected);
-// }
+#[test]
+fn asd() {
+    let input = "> - Any explicit\n>\n> **text**\n> - greetings";
+    let expected = ">⦁ Any explicit\n>\n>*text*\n>\n>⦁ greetings";
+    transform_expect_1(input, expected);
+}
 
 // #[test]
 // fn test1() {
