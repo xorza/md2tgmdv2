@@ -27,6 +27,7 @@ enum Descriptor {
     List,
     Item,
     Strong,
+    Emphasis,
 }
 
 impl Default for Converter {
@@ -130,10 +131,6 @@ impl Converter {
     }
 
     fn start_tag(&mut self, tag: Tag) -> anyhow::Result<()> {
-        // if matches!(self.prev_desc, Some(Descriptor::Paragraph)) {
-        //     self.add_to_result("\n", false);
-        // }
-
         match tag {
             Tag::Paragraph => {
                 self.add_to_result("\n", false);
@@ -187,6 +184,8 @@ impl Converter {
                 println!("Superscript");
             }
             Tag::Emphasis => {
+                self.add_to_result("_", false);
+                self.stack.push(Descriptor::Emphasis);
                 println!("Emphasis");
             }
             Tag::Strong => {
@@ -224,6 +223,7 @@ impl Converter {
         match tag {
             TagEnd::Paragraph => {
                 println!("EndParagraph");
+                self.add_new_line = true;
                 self.close_descriptor(Descriptor::Paragraph)?;
             }
             TagEnd::Heading(_) => {
@@ -269,9 +269,12 @@ impl Converter {
             }
             TagEnd::Emphasis => {
                 println!("EndEmphasis");
+                self.add_to_result("_", false);
+                self.close_descriptor(Descriptor::Emphasis)?;
             }
             TagEnd::Strong => {
                 println!("EndStrong");
+                self.add_to_result("*", false);
                 self.close_descriptor(Descriptor::Strong)?;
             }
             TagEnd::Strikethrough => {
@@ -307,16 +310,6 @@ impl Converter {
     fn close_descriptor(&mut self, descriptor: Descriptor) -> anyhow::Result<()> {
         let last = self.stack.pop().expect("Unexpected end tag");
         assert_eq!(last, descriptor, "Unexpected end tag");
-
-        match descriptor {
-            Descriptor::Paragraph => {
-                self.add_new_line = true;
-            }
-            Descriptor::Strong => {
-                self.add_to_result("*", false);
-            }
-            _ => {}
-        }
 
         Ok(())
     }
