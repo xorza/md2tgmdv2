@@ -295,7 +295,7 @@ fn test1() -> anyhow::Result<()> {
     let input = include_str!("1-input.md");
     let chunks = Converter::new(999999).go(input)?;
     let actual = chunks.join("===");
-    let expected = include_str!("1-output.txt");
+    let _expected = include_str!("1-output.txt");
 
     std::fs::write("tests/1-output.txt", &actual).unwrap();
     //assert_eq!(actual, expected);

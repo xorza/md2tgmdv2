@@ -27,6 +27,7 @@ pub struct Converter {
 enum Descriptor {
     Strong,
     Emphasis,
+    #[allow(dead_code)]
     CodeBlock(String),
     Strikethrough,
 }
@@ -411,10 +412,6 @@ impl Converter {
         }
 
         Ok(())
-    }
-
-    fn get_last_descriptor(&self) -> Descriptor {
-        self.stack.last().expect("Unexpected end tag").clone()
     }
 
     fn close_descriptor(&mut self, descriptor: Descriptor) -> anyhow::Result<()> {
