@@ -1,5 +1,4 @@
-#[allow(unused_imports)]
-use md2tgmdv2::{TELEGRAM_BOT_MAX_MESSAGE_LENGTH, transform};
+// use md2tgmdv2::{TELEGRAM_BOT_MAX_MESSAGE_LENGTH, };
 
 // #[test]
 // fn transforms_2_fixture() {

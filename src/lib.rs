@@ -19,7 +19,7 @@ pub struct Converter {
     prev_desc: Option<Descriptor>,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Descriptor {
     Paragraph,
 }
@@ -113,9 +113,14 @@ impl Converter {
     fn start_tag(&mut self, tag: Tag) -> anyhow::Result<()> {
         match tag {
             Tag::Paragraph => {
+                if matches!(self.prev_desc, Some(Descriptor::Paragraph)) {
+                    self.add_to_result("\n");
+                }
+                self.stack.push(Descriptor::Paragraph);
                 if self.prev_desc.is_some() {
                     self.add_to_result("\n");
                 }
+                self.prev_desc = None;
             }
             Tag::Heading { level, .. } => {
                 println!("Heading");
@@ -266,6 +271,14 @@ impl Converter {
 
     fn close_descriptor(&mut self, descriptor: Descriptor) -> anyhow::Result<()> {
         self.prev_desc = Some(descriptor);
+        let last = self.stack.pop();
+        if last.is_none() {
+            return Err(anyhow!("Unexpected end tag"));
+        }
+        let last = last.unwrap();
+        if last != descriptor {
+            return Err(anyhow!("Unexpected end tag"));
+        }
 
         Ok(())
     }
