@@ -62,8 +62,7 @@ Example: `600`\.
 `RECENT\_WINDOW\_TOKEN\_LIMIT` — how many tokens of raw “recent” conversation you aim to keep\.
 Example: `3\_000`\.
 
-Use the model’s tokenizer \(e\.g\. `tiktoken`\) to write:
-```text
+Use the model’s tokenizer \(e\.g\. `tiktoken`\) to write:===```text
 token\_count\(text\) \-\> approximate token count
 ```
 
@@ -75,8 +74,7 @@ Everything else will rely on this\.
 
 **✨ 3\.1\. Step 1 – Chunk the Conversation**
 
-Input:
-```text
+Input:===```text
 messages \= \[
   \{role: "user", content: "\.\.\."\},
   \{role: "assistant", content: "\.\.\."\},
@@ -86,8 +84,7 @@ messages \= \[
 
 Goal: `chunks\[\]`, where each `chunk` is a list of messages whose total tokens ≤ `MAX\_CHUNK\_TOKENS`\.
 
-Pseudocode:
-```pseudo
+Pseudocode:===```pseudo
 function chunk\_messages\(messages, max\_chunk\_tokens\):
     chunks \= \[\]
     current\_chunk \= \[\]
@@ -170,8 +167,7 @@ For each chunk, call the LLM with a strict summarization prompt\.
 ><insert this chunk’s messages, each prefixed with “user:” or “assistant:”\>
 >\[END SEGMENT\]
 
-Code‑ish:
-```pseudo
+Code‑ish:===```pseudo
 chunk\_summaries \= \[\]
 
 for i, chunk in enumerate\(chunks\):
@@ -195,8 +191,7 @@ If all `chunk\_summaries` together are still too big for your use case, compress
 
 Choose `group\_size` so that `group\_size \* TARGET\_CHUNK\_SUMMARY\_TOKENS` fits comfortably under `MAX\_CHUNK\_TOKENS`\.
 
-Example: if chunk summaries ≈300 tokens, `group\_size \= 10` ⇒ \~3000 tokens of input\.
-```pseudo
+Example: if chunk summaries ≈300 tokens, `group\_size \= 10` ⇒ \~3000 tokens of input\.===```pseudo
 group\_size \= 10
 groups \= \[\]
 for i in range\(0, len\(chunk\_summaries\), group\_size\):
@@ -243,8 +238,7 @@ Each `group` will be converted into a higher‑level summary\.
 ><insert the chunk summaries here, separated and in order\>
 >\[END SUMMARIES\]
 
-Pseudocode:
-```pseudo
+Pseudocode:===```pseudo
 group\_summaries \= \[\]
 
 for group in groups:
@@ -315,8 +309,7 @@ When conversation keeps growing, you need a **rolling** solution:
 ⦁ a small `long\_term\_memory` \(bounded text\), and
 ⦁ a list of `recent\_messages` \(raw most recent turns\)\.
 
-**✨ 4\.1\. State**
-```pseudo
+**✨ 4\.1\. State**===```pseudo
 state \= \{
     "long\_term\_memory": "",  \# string, ≤ MEMORY\_TOKEN\_LIMIT
     "recent\_messages": \[\]    \# list of \{role, content\}
@@ -325,8 +318,7 @@ state \= \{
 
 **✨ 4\.2\. On Every New User Message**
 
-Algorithm:
-```pseudo
+Algorithm:===```pseudo
 function handle\_user\_message\(user\_text\):
     \# 1\. Add new user message
     state\.recent\_messages\.append\(\{role: "user", content: user\_text\}\)
@@ -371,8 +363,7 @@ function handle\_user\_message\(user\_text\):
 Simple policy:
 
 ⦁ Always keep the last `K` messages raw,
-⦁ Summarize everything older, up to a token limit\.
-```pseudo
+⦁ Summarize everything older, up to a token limit\.===```pseudo
 function select\_old\_segment\(recent\_messages\):
     keep\_last\_turns \= 8  \# keep last 8 turns uncompressed
 
@@ -435,8 +426,7 @@ You merge `segment\_summary` into existing `long\_term\_memory` with another LLM
 >
 >⦁ Maximum 600 tokens\. Compress aggressively and drop low‑importance details if necessary\.
 
-Implementation:
-```pseudo
+Implementation:===```pseudo
 function update\_memory\(current\_memory, new\_summary\):
     prompt \= build\_update\_memory\_prompt\(current\_memory, new\_summary\)
     updated \= call\_llm\(prompt\)
@@ -452,8 +442,7 @@ This keeps `long\_term\_memory`:
 
 **✨ 4\.5\. Building the Actual Prompt for Answers**
 
-To let the LLM answer the user using compressed history:
-```pseudo
+To let the LLM answer the user using compressed history:===```pseudo
 function build\_answer\_prompt\(long\_term\_memory, recent\_messages\):
     text \= ""
     text \+\= "SYSTEM: You are an AI assistant\. You have access to a summarized long\-term memory of the user and our past conversation\. Use it when relevant, but do not invent details that are not present in the memory or the recent messages\.\\n\\n"

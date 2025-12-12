@@ -209,6 +209,11 @@ impl Converter {
             }
 
             let take = split_point(remaining, available);
+            if take == 0 {
+                // No safe split point within available space: start a new chunk.
+                self.split_chunk();
+                continue;
+            }
             let (part, rest) = remaining.split_at(take);
 
             self.flush_pending_prefix();
@@ -257,6 +262,7 @@ impl Converter {
     fn split_chunk(&mut self) {
         self.write_closers();
         self.result.push(String::new());
+        self.add_new_line = false;
         self.reopen_descriptors();
     }
 
@@ -326,6 +332,11 @@ impl Converter {
                 println!("BlockQuote");
             }
             Tag::CodeBlock(kind) => {
+                if let Some(last) = self.result.last() {
+                    if !last.is_empty() {
+                        self.split_chunk();
+                    }
+                }
                 let lang = match kind {
                     CodeBlockKind::Fenced(lang) => lang.to_string(),
                     CodeBlockKind::Indented => String::new(),
@@ -545,7 +556,7 @@ fn split_point(text: &str, max_len: usize) -> usize {
         }
     }
 
-    last_space.unwrap_or(max_len)
+    last_space.unwrap_or(0)
 }
 
 fn descriptor_closer(desc: &Descriptor) -> &'static str {

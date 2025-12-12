@@ -269,14 +269,14 @@ fn keeps_code_block_line_len_29() {
     );
 }
 
-// #[test]
-// fn splits_mixed_text_and_code_block() {
-//     transform_expect_n(
-//         "this text is 30ty chars long11\n```\n1234567890\n1234567890\n```",
-//         "this text is 30ty chars long11===```\n1234567890\n1234567890\n```",
-//         40,
-//     );
-// }
+#[test]
+fn splits_mixed_text_and_code_block() {
+    transform_expect_n(
+        "this text is 30ty chars long11\n```\n1234567890\n1234567890\n```",
+        "this text is 30ty chars long11===```\n1234567890\n1234567890\n```",
+        40,
+    );
+}
 
 // #[test]
 // fn removes_empty_lines_on_split_3() {
