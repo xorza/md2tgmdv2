@@ -159,7 +159,7 @@ fn keeps_angle_bracket_text_on_own_line() {
 
 #[test]
 fn converts_ordered_list_to_bullets() {
-    transform_expect_1("1. First\n2. Second", "1. First\n2. Second");
+    transform_expect_1("1. First\n2. Second", "1\\. First\n2\\. Second");
 }
 
 #[test]
@@ -308,7 +308,7 @@ fn asd() {
 fn asd1() {
     transform_expect_1(
         "You need\n\n1. **Model**\n- `MODEL` test.",
-        "You need\n\n1. *Model*\n  ⦁ `MODEL` test\\.",
+        "You need\n\n1\\. *Model*\n  ⦁ `MODEL` test\\.",
     );
 }
 
@@ -372,6 +372,19 @@ fn test5() -> anyhow::Result<()> {
     let _expected = include_str!("5-output.txt");
 
     std::fs::write("tests/5-output.txt", &actual).unwrap();
+    //assert_eq!(actual, expected);
+
+    Ok(())
+}
+
+#[test]
+fn test6() -> anyhow::Result<()> {
+    let input = include_str!("6-input.md");
+    let chunks = Converter::default().go(input)?;
+    let actual = chunks.join("===");
+    let _expected = include_str!("6-output.txt");
+
+    std::fs::write("tests/6-output.txt", &actual).unwrap();
     //assert_eq!(actual, expected);
 
     Ok(())

@@ -465,7 +465,7 @@ impl Converter {
         if let Some(state) = self.list_stack.last_mut() {
             if state.ordered {
                 let number = state.start + state.items.len() as u64;
-                return (format!("{}{}. ", indent, number), indent_len);
+                return (format!("{}{}\\. ", indent, number), indent_len);
             }
         }
         (format!("{}⦁ ", indent), indent_len)
