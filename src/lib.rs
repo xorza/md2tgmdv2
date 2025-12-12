@@ -157,7 +157,14 @@ impl Converter {
     }
 
     fn output_new_line(&mut self) {
-        self.output("\n", false);
+        let last = self.result.last_mut().unwrap();
+
+        if !last.is_empty() {
+            last.push_str("\n");
+        }
+        if self.quote_level > 0 {
+            last.push_str(&">".repeat(self.quote_level as usize));
+        }
     }
     fn output(&mut self, txt: &str, escape: bool) {
         let last = self.result.last_mut().unwrap();
@@ -168,16 +175,6 @@ impl Converter {
                 last.push_str(&">".repeat(self.quote_level as usize));
             }
             self.add_new_line = false;
-        }
-
-        if txt == "\n" {
-            if !last.is_empty() {
-                last.push_str("\n");
-            }
-            if self.quote_level > 0 {
-                last.push_str(&">".repeat(self.quote_level as usize));
-            }
-            return;
         }
 
         if last.is_empty() && self.quote_level > 0 {
