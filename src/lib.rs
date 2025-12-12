@@ -427,7 +427,7 @@ impl Converter {
         let descriptors = self.stack.clone();
         for desc in descriptors {
             match desc {
-                Descriptor::Strong => self.output("**", false),
+                Descriptor::Strong => self.output("*", false),
                 Descriptor::Emphasis => self.output("_", false),
                 Descriptor::Strikethrough => self.output("~~", false),
                 Descriptor::Code => self.output("`", false),
@@ -458,10 +458,10 @@ impl Converter {
             Tag::Heading { level, .. } => {
                 self.new_line();
                 match level {
-                    HeadingLevel::H1 => self.output("**🌟 ", false),
-                    HeadingLevel::H2 => self.output("**⭐ ", false),
-                    HeadingLevel::H3 => self.output("**✨ ", false),
-                    HeadingLevel::H4 => self.output("**🔸 ", false),
+                    HeadingLevel::H1 => self.output("*🌟 ", false),
+                    HeadingLevel::H2 => self.output("*⭐ ", false),
+                    HeadingLevel::H3 => self.output("*✨ ", false),
+                    HeadingLevel::H4 => self.output("*🔸 ", false),
                     HeadingLevel::H5 => self.output("_🔹 ", false),
                     HeadingLevel::H6 => self.output("_✴️ ", false),
                 }
@@ -544,7 +544,7 @@ impl Converter {
                 debug_log!("Emphasis");
             }
             Tag::Strong => {
-                self.output("**", false);
+                self.output("*", false);
                 self.stack.push(Descriptor::Strong);
 
                 debug_log!("Strong");
@@ -607,10 +607,10 @@ impl Converter {
             }
             TagEnd::Heading(level) => {
                 match level {
-                    HeadingLevel::H1 => self.output_closing("**", false),
-                    HeadingLevel::H2 => self.output_closing("**", false),
-                    HeadingLevel::H3 => self.output_closing("**", false),
-                    HeadingLevel::H4 => self.output_closing("**", false),
+                    HeadingLevel::H1 => self.output_closing("*", false),
+                    HeadingLevel::H2 => self.output_closing("*", false),
+                    HeadingLevel::H3 => self.output_closing("*", false),
+                    HeadingLevel::H4 => self.output_closing("*", false),
                     HeadingLevel::H5 => self.output_closing("_", false),
                     HeadingLevel::H6 => self.output_closing("_", false),
                 }
@@ -671,7 +671,7 @@ impl Converter {
                 debug_log!("EndEmphasis");
             }
             TagEnd::Strong => {
-                self.output_closing("**", false);
+                self.output_closing("*", false);
                 self.close_descriptor(Descriptor::Strong)?;
 
                 debug_log!("EndStrong");
@@ -731,7 +731,7 @@ fn split_point(text: &str, max_len: usize) -> usize {
 
 fn descriptor_closer(desc: &Descriptor) -> &'static str {
     match desc {
-        Descriptor::Strong => "**",
+        Descriptor::Strong => "*",
         Descriptor::Emphasis => "_",
         Descriptor::Strikethrough => "~~",
         Descriptor::Code => "`",
