@@ -42,6 +42,7 @@ enum Descriptor {
     CodeBlock(String),
     Strikethrough,
     Code,
+    Heading(HeadingLevel),
 }
 
 impl Default for Converter {
@@ -117,6 +118,7 @@ impl Converter {
                     debug_log!("Text {}", txt);
                 }
                 Event::Code(txt) => {
+                    self.ensure_space_for_open(1, 1, 1);
                     self.stack.push(Descriptor::Code);
                     self.output("`", false);
                     self.output(&txt, true);
@@ -196,6 +198,24 @@ impl Converter {
         }
 
         Ok(std::mem::take(&mut self.result))
+    }
+
+    /// Ensure current chunk has room for an opener + minimal body + closer.
+    /// If not, split before emitting the opener to avoid dangling markers.
+    fn ensure_space_for_open(&mut self, opener_len: usize, closer_len: usize, min_body: usize) {
+        let current_len = self.result.last().map(|s| s.len()).unwrap_or(0);
+        if current_len == 0 {
+            return;
+        }
+        let pending_prefix = self.pending_prefix_len();
+        let closers_len = self.closers_len(false) + closer_len;
+        let available = self
+            .max_len
+            .saturating_sub(current_len + pending_prefix + closers_len);
+        let needed = opener_len + min_body;
+        if available < needed {
+            self.split_chunk();
+        }
     }
 
     fn new_line(&mut self) {
@@ -359,6 +379,7 @@ impl Converter {
                 Descriptor::Emphasis => self.output("_", false),
                 Descriptor::Strikethrough => self.output("~~", false),
                 Descriptor::Code => self.output("`", false),
+                Descriptor::Heading(level) => self.output(heading_prefix(level), false),
                 Descriptor::CodeBlock(lang) => {
                     self.output("```", false);
                     self.output(&lang, true);
@@ -412,8 +433,15 @@ impl Converter {
                 debug_log!("Paragraph");
             }
             Tag::Heading { level, .. } => {
+                self.ensure_space_for_open(
+                    heading_prefix(level).len(),
+                    heading_closer(level).len(),
+                    1,
+                );
+
                 self.new_line();
                 self.output(heading_prefix(level), false);
+                self.stack.push(Descriptor::Heading(level));
 
                 debug_log!("Heading");
             }
@@ -433,16 +461,8 @@ impl Converter {
                 // line of code mid‑word. Reserve space for the opening fence,
                 // closing fence, and a little body headroom.
                 const MIN_CODE_BODY_HEADROOM: usize = 4;
-                let current_len = self.result.last().map(|s| s.len()).unwrap_or(0);
-                let pending_prefix = self.pending_prefix_len();
                 let header_len = 3 + lang.len(); // "```" + lang
-                let closers_len = 3; // closing "```"
-                let remaining_after_structure = self
-                    .max_len
-                    .saturating_sub(current_len + pending_prefix + header_len + closers_len);
-                if current_len > 0 && remaining_after_structure < MIN_CODE_BODY_HEADROOM {
-                    self.split_chunk();
-                }
+                self.ensure_space_for_open(header_len, 3, MIN_CODE_BODY_HEADROOM);
 
                 self.output("```", false);
                 self.output(&lang, true);
@@ -528,18 +548,21 @@ impl Converter {
                 debug_log!("Superscript");
             }
             Tag::Emphasis => {
+                self.ensure_space_for_open(1, 1, 1);
                 self.output("_", false);
                 self.stack.push(Descriptor::Emphasis);
 
                 debug_log!("Emphasis");
             }
             Tag::Strong => {
+                self.ensure_space_for_open(1, 1, 1);
                 self.output("*", false);
                 self.stack.push(Descriptor::Strong);
 
                 debug_log!("Strong");
             }
             Tag::Strikethrough => {
+                self.ensure_space_for_open(2, 2, 1);
                 self.output("~~", false);
                 self.stack.push(Descriptor::Strikethrough);
 
@@ -594,6 +617,7 @@ impl Converter {
                 self.output_closing(heading_closer(level), false);
                 self.add_new_line = false;
                 self.after_heading = true;
+                self.close_descriptor(Descriptor::Heading(level))?;
 
                 debug_log!("EndHeading");
             }
@@ -724,6 +748,7 @@ fn descriptor_closer(desc: &Descriptor) -> &'static str {
         Descriptor::Strikethrough => "~~",
         Descriptor::Code => "`",
         Descriptor::CodeBlock(_) => "```",
+        Descriptor::Heading(level) => heading_closer(*level),
     }
 }
 
@@ -773,6 +798,7 @@ impl PartialEq for Descriptor {
             (Descriptor::CodeBlock(_), Descriptor::CodeBlock(_)) => true,
             (Descriptor::Code, Descriptor::Code) => true,
             (Descriptor::Strikethrough, Descriptor::Strikethrough) => true,
+            (Descriptor::Heading(a), Descriptor::Heading(b)) => a == b,
             _ => unimplemented!(),
         }
     }

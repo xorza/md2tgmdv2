@@ -107,9 +107,7 @@ Important details:
 ————————
 
 *⭐ 4\) Step B — Summarize each chunk with a strict schema*
-A vague “summarize this” prompt loses constraints and decisions\. Use a fixed schema\.
-
-*✨===Chunk summary prompt \(copy/paste\)*
+A vague “summarize this” prompt loses constraints and decisions\. Use a fixed schema\.===*✨ Chunk summary prompt \(copy/paste\)*
 >You are summarizing a segment of a long user–assistant conversation\.
 >PURPOSE: Produce a compact, information\-dense summary that can replace the raw messages in future prompts\.
 >
@@ -230,7 +228,7 @@ Store as `long\_term\_memory`\.
 
 ————————
 
-*⭐ 7\) Ongoing chat: rolling memory===updates \(so you never overflow\)*
+*⭐ 7\) Ongoing chat: rolling memory*===*⭐ updates \(so you never overflow\)*
 Maintain:
 ⦁ `long\_term\_memory` \(≤ `MEMORY\_TOKEN\_LIMIT`\)
 ⦁ `recent\_messages` \(raw, last \~`RECENT\_WINDOW\_TOKEN\_LIMIT` tokens\)
