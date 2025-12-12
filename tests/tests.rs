@@ -282,13 +282,13 @@ fn splits_mixed_text_and_code_block() {
 fn removes_empty_lines_on_split_3() {
     transform_expect_n("1234567890\n\n1234567890", "1234567890===1234567890", 10);
 }
-//
-// #[test]
-// fn url_not_split_across_chunks() {
-//     let input = "1234567890123456789012345678901234567890123456789012345678901234567890 [see docs](https://example.com/path";
-//     let expected = "1234567890123456789012345678901234567890123456789012345678901234567890===[see docs](https://example.com/path";
-//     transform_expect_n(input, expected, 80);
-// }
+
+#[test]
+fn url_not_split_across_chunks() {
+    let input = "1234567890123456789012345678901234567890123456789012345678901234567890 [see docs](https://example.com/path)";
+    let expected = "1234567890123456789012345678901234567890123456789012345678901234567890===[see docs](https://example\\.com/path)";
+    transform_expect_n(input, expected, 80);
+}
 
 #[test]
 fn test1() -> anyhow::Result<()> {

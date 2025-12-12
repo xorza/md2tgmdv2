@@ -83,7 +83,7 @@ impl Converter {
                     } else {
                         let txt = escape_text(&txt);
                         let url = escape_text(&self.link_dest_url);
-                        self.output(&format!("[{}]({})", txt, url), false);
+                        self.output_unbreakable(&format!("[{}]({})", txt, url), false);
 
                         self.link_dest_url.clear();
                     }
@@ -184,6 +184,53 @@ impl Converter {
         self.output_with_skip(txt, escape, false);
     }
 
+    /// Emit text that should stay together in a single chunk (e.g., full links).
+    /// If the text itself exceeds the chunk size, fall back to splitting at the
+    /// available boundary to maintain the Telegram limit.
+    fn output_unbreakable(&mut self, txt: &str, escape: bool) {
+        let owned = if escape {
+            escape_text(txt)
+        } else {
+            txt.to_string()
+        };
+
+        let mut remaining = owned.as_str();
+        while !remaining.is_empty() {
+            let pending_prefix = self.pending_prefix_len();
+            let closers_len = self.closers_len(false);
+            let current_len = self.result.last().map(|s| s.len()).unwrap_or(0);
+
+            if current_len + pending_prefix + closers_len >= self.max_len {
+                self.split_chunk();
+                continue;
+            }
+
+            let available = self.max_len - current_len - pending_prefix - closers_len;
+            let take = if remaining.len() <= available {
+                remaining.len()
+            } else if remaining.len() > self.max_len {
+                // Unbreakable text longer than a whole chunk: split at the limit.
+                available
+            } else {
+                0
+            };
+
+            if take == 0 {
+                self.split_chunk();
+                continue;
+            }
+
+            self.flush_pending_prefix();
+            let last = self.result.last_mut().unwrap();
+            last.push_str(&remaining[..take]);
+            remaining = &remaining[take..];
+
+            if !remaining.is_empty() {
+                self.split_chunk();
+            }
+        }
+    }
+
     /// Write a closing marker for the currently open top descriptor.
     /// This skips reserving space for that descriptor's own closer,
     /// so we don't over-reserve and force an unnecessary split.
@@ -227,8 +274,23 @@ impl Converter {
 
             self.flush_pending_prefix();
 
-            let last = self.result.last_mut().unwrap();
-            last.push_str(part);
+            // When we split, drop whitespace that straddles the boundary to avoid
+            // trailing spaces in the previous chunk or leading spaces in the next.
+            // Keep newlines intact so code blocks and wrapped text remain correct.
+            let soft_ws = |c: char| c == ' ' || c == '\t';
+            let (part, rest) = if rest.is_empty() {
+                (part, rest)
+            } else {
+                (
+                    part.trim_end_matches(soft_ws),
+                    rest.trim_start_matches(soft_ws),
+                )
+            };
+
+            if !part.is_empty() {
+                let last = self.result.last_mut().unwrap();
+                last.push_str(part);
+            }
 
             remaining = rest;
 
@@ -269,6 +331,11 @@ impl Converter {
     }
 
     fn split_chunk(&mut self) {
+        if let Some(last) = self.result.last_mut() {
+            while last.ends_with(' ') || last.ends_with('\t') {
+                last.pop();
+            }
+        }
         self.write_closers();
         self.result.push(String::new());
         self.add_new_line = false;
