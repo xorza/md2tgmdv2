@@ -230,9 +230,7 @@ impl Converter {
     fn take_escaped(&mut self, txt: &str) -> String {
         self.buffer.clear();
         push_escaped(&mut self.buffer, txt);
-        let mut owned = String::new();
-        std::mem::swap(&mut self.buffer, &mut owned);
-        owned
+        std::mem::take(&mut self.buffer)
     }
 
     /// Emit text that should stay together in a single chunk (e.g., full links).
