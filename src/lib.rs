@@ -479,11 +479,13 @@ impl Converter {
         }
         match tag {
             Tag::Paragraph => {
-                if self.after_heading {
+                if self.after_list_prefix {
+                    // Continue on the same line after a list marker.
+                    self.after_list_prefix = false;
+                    self.after_heading = false;
+                } else if self.after_heading {
                     self.new_line();
                     self.after_heading = false;
-                } else if self.after_list_prefix {
-                    self.after_list_prefix = false;
                 } else {
                     self.new_line();
                 }

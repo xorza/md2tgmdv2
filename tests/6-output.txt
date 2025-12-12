@@ -335,8 +335,7 @@ This scales indefinitely because every component has a hard cap\.
 ————————
 
 *⭐ 10\) Common Failure Modes \(And Fixes\)*
-1\. 
-*Summary loses important numbers/commands*
+1\. *Summary loses important numbers/commands*
 Fix: explicitly instruct “preserve all numbers, file paths, commands, API names\.”
 2\. *Memory grows without bound*
 Fix: enforce strict memory token limit and require dropping low\-value details\.

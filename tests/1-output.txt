@@ -419,8 +419,7 @@ You send this \(or an equivalent structured version\) as context to the LLM, ens
 ————————
 
 *⭐ 5\. Core Rules to Remember*
-1\. 
-*Never send the full raw conversation once it’s large\.*
+1\. *Never send the full raw conversation once it’s large\.*
 Always send:
   ⦁ A compressed long‑term memory,
   ⦁ A recent window of raw messages\.

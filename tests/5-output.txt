@@ -289,8 +289,7 @@ This pattern scales indefinitely because you always cap each component\.
 ————————
 
 *⭐ 10\) Common failure modes \(and how to prevent them\)*
-1\. 
-*Summaries become too vague*
+1\. *Summaries become too vague*
   ⦁ Fix: enforce a schema and require “Key Facts / Constraints” \+ “Decisions” \+ “TODOs”\.
 2\. *Important numbers/details lost*
   ⦁ Fix: explicit instruction: “preserve all numbers, commands, file paths, API names”\.
