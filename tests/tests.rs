@@ -242,32 +242,32 @@ fn splits_code_block_line_len_18() {
     );
 }
 
-// #[test]
-// fn splits_code_block_line_len_19() {
-//     transform_expect_n(
-//         "```\n1234567890\n1234567890\n```",
-//         "```\n1234567890\n```===```\n1234567890\n```",
-//         19,
-//     );
-// }
+#[test]
+fn splits_code_block_line_len_19() {
+    transform_expect_n(
+        "```\n1234567890\n1234567890\n```",
+        "```\n1234567890\n```===```\n1234567890\n```",
+        19,
+    );
+}
 
-// #[test]
-// fn splits_code_block_line_len_28() {
-//     transform_expect_n(
-//         "```\n1234567890\n1234567890\n```",
-//         "```\n1234567890\n```===```\n1234567890\n```",
-//         28,
-//     );
-// }
+#[test]
+fn splits_code_block_line_len_28() {
+    transform_expect_n(
+        "```\n1234567890\n1234567890\n```",
+        "```\n1234567890\n```===```\n1234567890\n```",
+        28,
+    );
+}
 
-// #[test]
-// fn keeps_code_block_line_len_29() {
-//     transform_expect_n(
-//         "```\n1234567890\n1234567890\n```",
-//         "```\n1234567890\n1234567890\n```",
-//         29,
-//     );
-// }
+#[test]
+fn keeps_code_block_line_len_29() {
+    transform_expect_n(
+        "```\n1234567890\n1234567890\n```",
+        "```\n1234567890\n1234567890\n```",
+        29,
+    );
+}
 
 // #[test]
 // fn splits_mixed_text_and_code_block() {
