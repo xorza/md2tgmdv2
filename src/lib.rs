@@ -176,6 +176,17 @@ impl Converter {
         if !self.stack.is_empty() {
             return Err(anyhow!("Unbalanced tags"));
         }
+        
+        for (idx, chunk) in self.result.iter().enumerate() {
+            if chunk.len() > self.max_len {
+                return Err(anyhow!(
+                    "internal parser error: chunk {} exceeds max_len ({} > {})",
+                    idx,
+                    chunk.len(),
+                    self.max_len
+                ));
+            }
+        }
 
         Ok(std::mem::take(&mut self.result))
     }
