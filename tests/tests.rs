@@ -293,7 +293,7 @@ fn url_not_split_across_chunks() {
 #[test]
 fn test1() -> anyhow::Result<()> {
     let input = include_str!("1-input.md");
-    let chunks = Converter::new(999999).go(input)?;
+    let chunks = Converter::default().go(input)?;
     let actual = chunks.join("===");
     let _expected = include_str!("1-output.txt");
 
@@ -303,35 +303,41 @@ fn test1() -> anyhow::Result<()> {
     Ok(())
 }
 
-// #[test]
-// fn test2() {
-//     let input = include_str!("2-input.md");
-//     let chunks = transform(input, 99999);
-//     let actual = chunks.join("===");
-//     let expected = include_str!("2-output.txt");
+#[test]
+fn test2() -> anyhow::Result<()> {
+    let input = include_str!("2-input.md");
+    let chunks = Converter::default().go(input)?;
+    let actual = chunks.join("===");
+    let _expected = include_str!("2-output.txt");
 
-//     std::fs::write("tests/2-output.txt", &actual).unwrap();
-//     assert_eq!(actual, expected);
-// }
+    std::fs::write("tests/2-output.txt", &actual).unwrap();
+    //assert_eq!(actual, expected);
 
-// #[test]
-// fn test3() {
-//     let input = include_str!("3-input.md");
-//     let chunks = transform(input, TELEGRAM_BOT_MAX_MESSAGE_LENGTH);
-//     let actual = chunks.join("===");
-//     let expected = include_str!("3-output.txt");
+    Ok(())
+}
 
-//     std::fs::write("tests/3-output.txt", &actual).unwrap();
-//     // assert_eq!(actual, expected);
-// }
+#[test]
+fn test3() -> anyhow::Result<()> {
+    let input = include_str!("3-input.md");
+    let chunks = Converter::default().go(input)?;
+    let actual = chunks.join("===");
+    let _expected = include_str!("3-output.txt");
 
-// #[test]
-// fn test4() {
-//     let input = include_str!("4-input.md");
-//     let chunks = transform(input, TELEGRAM_BOT_MAX_MESSAGE_LENGTH);
-//     let actual = chunks.join("===");
-//     let expected = include_str!("4-output.txt");
+    std::fs::write("tests/3-output.txt", &actual).unwrap();
+    // assert_eq!(actual, expected);
 
-//     // std::fs::write("tests/4-output.txt", &actual).unwrap();
-//     assert_eq!(actual, expected);
-// }
+    Ok(())
+}
+
+#[test]
+fn test4() -> anyhow::Result<()> {
+    let input = include_str!("4-input.md");
+    let chunks = Converter::default().go(input)?;
+    let actual = chunks.join("===");
+    let _expected = include_str!("4-output.txt");
+
+    std::fs::write("tests/4-output.txt", &actual).unwrap();
+    //assert_eq!(actual, expected);
+
+    Ok(())
+}

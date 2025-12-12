@@ -90,9 +90,22 @@ impl Converter {
                     if self.link_dest_url.is_empty() {
                         self.output(&txt, true);
                     } else {
-                        let txt = escape_text(&txt);
-                        let url = escape_text(&self.link_dest_url);
-                        self.output_unbreakable(&format!("[{}]({})", txt, url), false);
+                        self.buffer.clear();
+                        self.buffer.push('[');
+                        push_escaped(&mut self.buffer, &txt);
+                        self.buffer.push_str("](");
+                        push_escaped(&mut self.buffer, &self.link_dest_url);
+                        self.buffer.push(')');
+
+                        // Move the built link out to avoid holding an immutable borrow
+                        // while mutably using `self` during output.
+                        let mut link = String::new();
+                        std::mem::swap(&mut self.buffer, &mut link);
+                        self.output_unbreakable(link.as_str(), false);
+
+                        // Return the owned buffer for reuse and leave it clean.
+                        self.buffer = link;
+                        self.buffer.clear();
 
                         self.link_dest_url.clear();
                     }
@@ -166,6 +179,8 @@ impl Converter {
         if !self.stack.is_empty() {
             return Err(anyhow!("Unbalanced tags"));
         }
+        
+        
 
         Ok(std::mem::take(&mut self.result))
     }
@@ -193,17 +208,27 @@ impl Converter {
         self.output_with_skip(txt, escape, false);
     }
 
+    /// Escape text and move it out, leaving `buffer` empty for reuse.
+    fn take_escaped(&mut self, txt: &str) -> String {
+        self.buffer.clear();
+        push_escaped(&mut self.buffer, txt);
+        let mut owned = String::new();
+        std::mem::swap(&mut self.buffer, &mut owned);
+        owned
+    }
+
     /// Emit text that should stay together in a single chunk (e.g., full links).
     /// If the text itself exceeds the chunk size, fall back to splitting at the
     /// available boundary to maintain the Telegram limit.
     fn output_unbreakable(&mut self, txt: &str, escape: bool) {
-        let owned = if escape {
-            escape_text(txt)
+        // Reuse the internal buffer for escaped text to limit allocations.
+        let mut temp = None;
+        let mut remaining: &str = if escape {
+            temp = Some(self.take_escaped(txt));
+            temp.as_ref().unwrap().as_str()
         } else {
-            txt.to_string()
+            txt
         };
-
-        let mut remaining = owned.as_str();
         while !remaining.is_empty() {
             let pending_prefix = self.pending_prefix_len();
             let closers_len = self.closers_len(false);
@@ -238,6 +263,10 @@ impl Converter {
                 self.split_chunk();
             }
         }
+        if let Some(owned) = temp {
+            self.buffer = owned;
+            self.buffer.clear(); // leave buffer clean for the next use
+        }
     }
 
     /// Write a closing marker for the currently open top descriptor.
@@ -248,13 +277,14 @@ impl Converter {
     }
 
     fn output_with_skip(&mut self, txt: &str, escape: bool, skip_top: bool) {
-        let owned = if escape {
-            escape_text(txt)
+        // Reuse the internal buffer for escaped text to limit allocations.
+        let mut temp = None;
+        let mut remaining: &str = if escape {
+            temp = Some(self.take_escaped(txt));
+            temp.as_ref().unwrap().as_str()
         } else {
-            txt.to_string()
+            txt
         };
-
-        let mut remaining = owned.as_str();
         while !remaining.is_empty() {
             // Reserve room for pending prefix and required closers so we never
             // overflow the chunk once we have to emit closing markers.
@@ -273,12 +303,15 @@ impl Converter {
                 continue;
             }
 
-            let take = split_point(remaining, available);
-            if take == 0 {
-                // No safe split point within available space: start a new chunk.
-                self.split_chunk();
-                continue;
-            }
+            let mut take = split_point(remaining, available);
+            let forced_split = if take == 0 {
+                // No safe split point within available space: fall back to a hard split
+                // at the available boundary to guarantee forward progress.
+                take = available;
+                true
+            } else {
+                false
+            };
             let (part, rest) = remaining.split_at(take);
 
             self.flush_pending_prefix();
@@ -286,20 +319,24 @@ impl Converter {
             // When we split, drop whitespace that straddles the boundary to avoid
             // trailing spaces in the previous chunk or leading spaces in the next.
             // Keep newlines intact so code blocks and wrapped text remain correct.
-            let soft_ws = |c: char| c == ' ' || c == '\t';
-            let (part, rest) = if rest.is_empty() {
+            let (part, rest) = if rest.is_empty() || forced_split {
                 (part, rest)
             } else {
+                let soft_ws = |c: char| c == ' ' || c == '\t';
                 (
                     part.trim_end_matches(soft_ws),
                     rest.trim_start_matches(soft_ws),
                 )
             };
 
-            if !part.is_empty() {
-                let last = self.result.last_mut().unwrap();
-                last.push_str(part);
+            if part.is_empty() {
+                // Dropped only whitespace; keep filling the current chunk.
+                remaining = rest;
+                continue;
             }
+
+            let last = self.result.last_mut().unwrap();
+            last.push_str(part);
 
             remaining = rest;
 
@@ -307,6 +344,10 @@ impl Converter {
                 // We still have content left; close and reopen formatting for the next chunk.
                 self.split_chunk();
             }
+        }
+        if let Some(owned) = temp {
+            self.buffer = owned;
+            self.buffer.clear(); // leave buffer clean for the next use
         }
     }
 
@@ -654,9 +695,9 @@ fn descriptor_closer(desc: &Descriptor) -> &'static str {
     }
 }
 
-fn escape_text(text: &str) -> String {
-    // Single pass escape to avoid O(n*k) replace chaining.
-    let mut out = String::with_capacity(text.len() * 2); // worst case every char escapes
+
+/// Escape Telegram MarkdownV2 control characters into the provided buffer.
+fn push_escaped(out: &mut String, text: &str) {
     for ch in text.chars() {
         match ch {
             '\\' | '*' | '_' | '[' | ']' | '(' | ')' | '~' | '`' | '>' | '#' | '+' | '-' | '='
@@ -667,7 +708,6 @@ fn escape_text(text: &str) -> String {
             _ => out.push(ch),
         }
     }
-    out
 }
 
 impl PartialEq for Descriptor {
@@ -684,14 +724,3 @@ impl PartialEq for Descriptor {
 }
 
 impl Eq for Descriptor {}
-
-// #[test]
-// fn test() -> anyhow::Result<()> {
-//     let text = include_str!("../tests/1-input.md");
-//     let _ = transform(text, TELEGRAM_BOT_MAX_MESSAGE_LENGTH)?;
-
-//     let text = include_str!("../tests/3-input.md");
-//     let _ = transform(text, TELEGRAM_BOT_MAX_MESSAGE_LENGTH)?;
-
-//     Ok(())
-// }
