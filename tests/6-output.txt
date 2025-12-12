@@ -223,8 +223,8 @@ Now take the global summary and convert it into a *memory* you can inject into f
 >
 >Keep only information likely to matter later:
 >⦁ User profile \(skill level, preferences, constraints\)
->⦁ Environment constraints \(OS, tooling, languages, repos\)
->⦁ Ong===>oing projects and current status
+>⦁ Environment constraints \(OS, tooling, languages, repos\)===
+>⦁ Ongoing projects and current status
 >⦁ Key decisions and short rationale
 >⦁ Open questions / TODOs
 >
@@ -349,4 +349,4 @@ Fix: trigger summarization earlier \(at 60–70% usage\), not at 95–100%\.
 If you tell me:
 ⦁ which model you’re using and its context size, and
 ⦁ whether you need offline summarization or live rolling memory,
-I can recommend exact budget===numbers \(chunk size, summary size, trigger thresholds\) that typically work well for that setup\.
+I can recommend exact===budget numbers \(chunk size, summary size, trigger thresholds\) that typically work well for that setup\.

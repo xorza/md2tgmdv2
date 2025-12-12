@@ -29,6 +29,9 @@ pub struct Converter {
     list_stack: Vec<ListState>,
     carry_list_indent_levels: usize,
     after_list_prefix: bool,
+    last_list_prefix: String,
+    list_body_written: bool,
+    heading_body_written: bool,
     link_dest_url: String,
     // Depth counter for temporarily skipping events (used for image alt text).
     skip_depth: u16,
@@ -57,6 +60,9 @@ impl Default for Converter {
             list_stack: Vec::new(),
             carry_list_indent_levels: 0,
             after_list_prefix: false,
+            last_list_prefix: String::new(),
+            list_body_written: false,
+            heading_body_written: false,
             link_dest_url: String::new(),
             skip_depth: 0,
         }
@@ -218,6 +224,23 @@ impl Converter {
         }
     }
 
+    /// Ensure current chunk has room for a prefix (e.g., list marker) plus body.
+    fn ensure_space_for_prefix(&mut self, prefix_len: usize, min_body: usize) {
+        let current_len = self.result.last().map(|s| s.len()).unwrap_or(0);
+        if current_len == 0 {
+            return;
+        }
+        let pending_prefix = self.pending_prefix_len();
+        let closers_len = self.closers_len(false);
+        let available = self
+            .max_len
+            .saturating_sub(current_len + pending_prefix + closers_len);
+        let needed = prefix_len + min_body;
+        if available < needed {
+            self.split_chunk();
+        }
+    }
+
     fn new_line(&mut self) {
         // Any newline ends the "after prefix" state to avoid suppressing later breaks.
         self.after_list_prefix = false;
@@ -273,8 +296,19 @@ impl Converter {
             }
 
             let take = if breakable {
-                let sp = split_point(remaining, available);
-                if sp == 0 { available } else { sp }
+                let allow_hard_split = current_len == 0;
+                let sp = split_point(remaining, available, allow_hard_split);
+                if sp == 0 {
+                    // No whitespace before limit. If there is existing content, start a new chunk
+                    // so we don't split mid-word. Otherwise, force a split (single very long word).
+                    if current_len > 0 {
+                        self.split_chunk();
+                        continue;
+                    }
+                    available
+                } else {
+                    sp
+                }
             } else if remaining.len() > available && remaining.len() <= self.max_len {
                 // Keep unbreakable text together if it can fit a fresh chunk.
                 self.split_chunk();
@@ -305,6 +339,9 @@ impl Converter {
             if !part.is_empty() {
                 let last = self.result.last_mut().unwrap();
                 last.push_str(part);
+                if self.after_list_prefix {
+                    self.list_body_written = true;
+                }
             }
 
             remaining = rest;
@@ -345,15 +382,70 @@ impl Converter {
     }
 
     fn split_chunk(&mut self) {
-        if let Some(last) = self.result.last_mut() {
-            while last.ends_with(' ') || last.ends_with('\t') {
-                last.pop();
+        let heading_no_body =
+            !self.heading_body_written && matches!(self.stack.last(), Some(Descriptor::Heading(_)));
+        if !heading_no_body {
+            if let Some(last) = self.result.last_mut() {
+                while last.ends_with(' ') || last.ends_with('\t') {
+                    last.pop();
+                }
             }
         }
+        // If a list prefix was emitted without any body text, move it to the next chunk
+        // so we don't split right after the marker.
+        let mut carry_list_prefix = None;
+        let mut carry_list_prefix_newline = false;
+        if self.after_list_prefix && !self.list_body_written {
+            carry_list_prefix = Some(self.last_list_prefix.clone());
+            if let Some(last) = self.result.last_mut() {
+                let len = last.len();
+                let trim = carry_list_prefix.as_ref().map(|s| s.len()).unwrap_or(0);
+                if len >= trim {
+                    last.truncate(len - trim);
+                }
+                // Remove trailing newline that belonged to the carried prefix.
+                while last.ends_with('\n') || last.ends_with('\r') {
+                    last.pop();
+                    carry_list_prefix_newline = true;
+                }
+            }
+        }
+        // If a heading opener was emitted with no body yet, carry it to next chunk.
+        let mut carried_heading: Option<Descriptor> = None;
+        if !self.heading_body_written {
+            if let Some(Descriptor::Heading(level)) = self.stack.last() {
+                let opener = heading_prefix(*level);
+                if let Some(last) = self.result.last_mut() {
+                    if last.ends_with(opener) {
+                        last.truncate(last.len() - opener.len());
+                        carried_heading = Some(Descriptor::Heading(*level));
+                    }
+                }
+            }
+        }
+
+        // When carrying a heading, temporarily pop so we don't write its closer here.
+        if carried_heading.is_some() {
+            self.stack.pop();
+        }
+
         self.write_closers();
+
+        // Restore carried heading to the stack for reopening.
+        if let Some(ref h) = carried_heading {
+            self.stack.push(h.clone());
+        }
         self.result.push(String::new());
-        self.add_new_line = false;
+        self.add_new_line = carry_list_prefix_newline;
         self.reopen_descriptors();
+        if let Some(prefix) = carry_list_prefix {
+            // Re-emit quote prefix if needed.
+            self.flush_pending_prefix();
+            let chunk_idx = self.result.len() - 1;
+            self.result[chunk_idx].push_str(&prefix);
+            self.after_list_prefix = true;
+            self.list_body_written = false;
+        }
     }
 
     fn write_closers(&mut self) {
@@ -442,6 +534,7 @@ impl Converter {
                 self.new_line();
                 self.output(heading_prefix(level), false);
                 self.stack.push(Descriptor::Heading(level));
+                self.heading_body_written = false;
 
                 debug_log!("Heading");
             }
@@ -505,6 +598,8 @@ impl Converter {
                     self.add_new_line = false;
                 }
                 let prefix = self.list_prefix();
+                // Avoid leaving the prefix at the end of the chunk with no body.
+                self.ensure_space_for_prefix(prefix.len(), 1);
                 // Ensure the prefix fits; if not, split first.
                 let pending_prefix = self.pending_prefix_len();
                 let closers_len = self.closers_len(false);
@@ -515,6 +610,8 @@ impl Converter {
                 self.flush_pending_prefix();
                 let chunk_idx = self.result.len() - 1;
                 self.result[chunk_idx].push_str(&prefix);
+                self.last_list_prefix = prefix.clone();
+                self.list_body_written = false;
 
                 if let Some(state) = self.list_stack.last_mut() {
                     if state.ordered {
@@ -618,6 +715,7 @@ impl Converter {
                 self.add_new_line = false;
                 self.after_heading = true;
                 self.close_descriptor(Descriptor::Heading(level))?;
+                self.heading_body_written = false;
 
                 debug_log!("EndHeading");
             }
@@ -723,7 +821,7 @@ impl Converter {
     }
 }
 
-fn split_point(text: &str, max_len: usize) -> usize {
+fn split_point(text: &str, max_len: usize, allow_hard_split: bool) -> usize {
     if text.len() <= max_len {
         return text.len();
     }
@@ -738,7 +836,11 @@ fn split_point(text: &str, max_len: usize) -> usize {
         }
     }
 
-    last_space.unwrap_or(0)
+    if let Some(sp) = last_space {
+        return sp;
+    }
+
+    if allow_hard_split { max_len } else { 0 }
 }
 
 fn descriptor_closer(desc: &Descriptor) -> &'static str {
