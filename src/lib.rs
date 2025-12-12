@@ -37,6 +37,39 @@ pub struct Converter {
     skip_depth: u16,
 }
 
+/// Small helper used to budget space in the current chunk before emitting new
+/// content. `lead` is any text that must be written before the body (e.g.,
+/// openers or list prefixes), `tail` is space we must reserve for a trailing
+/// closer, and `min_body` is the smallest body we intend to keep with the
+/// opener/prefix to avoid dangling markers.
+#[derive(Clone, Copy)]
+struct SpaceBudget {
+    lead: usize,
+    tail: usize,
+    min_body: usize,
+    skip_top: bool,
+}
+
+impl SpaceBudget {
+    fn for_open(opener_len: usize, closer_len: usize, min_body: usize) -> Self {
+        Self {
+            lead: opener_len,
+            tail: closer_len,
+            min_body,
+            skip_top: false,
+        }
+    }
+
+    fn for_prefix(prefix_len: usize, min_body: usize) -> Self {
+        Self {
+            lead: prefix_len,
+            tail: 0,
+            min_body,
+            skip_top: false,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 enum Descriptor {
     Strong,
@@ -124,7 +157,7 @@ impl Converter {
                     debug_log!("Text {}", txt);
                 }
                 Event::Code(txt) => {
-                    self.ensure_space_for_open(1, 1, 1);
+                    self.ensure_space(SpaceBudget::for_open(1, 1, 1));
                     self.stack.push(Descriptor::Code);
                     self.output("`", false);
                     self.output(&txt, true);
@@ -206,39 +239,27 @@ impl Converter {
         Ok(std::mem::take(&mut self.result))
     }
 
-    /// Ensure current chunk has room for an opener + minimal body + closer.
-    /// If not, split before emitting the opener to avoid dangling markers.
-    fn ensure_space_for_open(&mut self, opener_len: usize, closer_len: usize, min_body: usize) {
-        let current_len = self.result.last().map(|s| s.len()).unwrap_or(0);
-        if current_len == 0 {
+    /// Ensure the current chunk can fit the requested budget. If not, split
+    /// before emitting the next content to avoid dangling markers or prefixes.
+    fn ensure_space(&mut self, budget: SpaceBudget) {
+        if self.result.last().map(|s| s.is_empty()).unwrap_or(true) {
             return;
         }
-        let pending_prefix = self.pending_prefix_len();
-        let closers_len = self.closers_len(false) + closer_len;
-        let available = self
-            .max_len
-            .saturating_sub(current_len + pending_prefix + closers_len);
-        let needed = opener_len + min_body;
+        let available = self.available_space(budget.skip_top);
+        let needed = budget.lead + budget.min_body + budget.tail;
         if available < needed {
             self.split_chunk();
         }
     }
 
-    /// Ensure current chunk has room for a prefix (e.g., list marker) plus body.
-    fn ensure_space_for_prefix(&mut self, prefix_len: usize, min_body: usize) {
+    /// Compute remaining writable space in the current chunk after accounting
+    /// for any pending prefixes (newline/quotes) and the closers of the open
+    /// descriptors. When `skip_top` is true we ignore the closer of the topmost
+    /// descriptor (used while writing that closer itself).
+    fn available_space(&self, skip_top: bool) -> usize {
         let current_len = self.result.last().map(|s| s.len()).unwrap_or(0);
-        if current_len == 0 {
-            return;
-        }
-        let pending_prefix = self.pending_prefix_len();
-        let closers_len = self.closers_len(false);
-        let available = self
-            .max_len
-            .saturating_sub(current_len + pending_prefix + closers_len);
-        let needed = prefix_len + min_body;
-        if available < needed {
-            self.split_chunk();
-        }
+        let reserved = self.pending_prefix_len() + self.closers_len(skip_top);
+        self.max_len.saturating_sub(current_len + reserved)
     }
 
     fn new_line(&mut self) {
@@ -280,16 +301,8 @@ impl Converter {
 
         while !remaining.is_empty() {
             // Make sure pending prefixes and closers still fit.
-            let pending_prefix = self.pending_prefix_len();
-            let closers_len = self.closers_len(skip_top);
             let current_len = self.result.last().map(|s| s.len()).unwrap_or(0);
-
-            if current_len + pending_prefix + closers_len >= self.max_len {
-                self.split_chunk();
-                continue;
-            }
-
-            let available = self.max_len - current_len - pending_prefix - closers_len;
+            let available = self.available_space(skip_top);
             if available == 0 {
                 self.split_chunk();
                 continue;
@@ -382,47 +395,14 @@ impl Converter {
     }
 
     fn split_chunk(&mut self) {
-        let heading_no_body =
+        let heading_pending =
             !self.heading_body_written && matches!(self.stack.last(), Some(Descriptor::Heading(_)));
-        if !heading_no_body {
-            if let Some(last) = self.result.last_mut() {
-                while last.ends_with(' ') || last.ends_with('\t') {
-                    last.pop();
-                }
-            }
+        if !heading_pending {
+            self.trim_trailing_ws();
         }
-        // If a list prefix was emitted without any body text, move it to the next chunk
-        // so we don't split right after the marker.
-        let mut carry_list_prefix = None;
-        let mut carry_list_prefix_newline = false;
-        if self.after_list_prefix && !self.list_body_written {
-            carry_list_prefix = Some(self.last_list_prefix.clone());
-            if let Some(last) = self.result.last_mut() {
-                let len = last.len();
-                let trim = carry_list_prefix.as_ref().map(|s| s.len()).unwrap_or(0);
-                if len >= trim {
-                    last.truncate(len - trim);
-                }
-                // Remove trailing newline that belonged to the carried prefix.
-                while last.ends_with('\n') || last.ends_with('\r') {
-                    last.pop();
-                    carry_list_prefix_newline = true;
-                }
-            }
-        }
-        // If a heading opener was emitted with no body yet, carry it to next chunk.
-        let mut carried_heading: Option<Descriptor> = None;
-        if !self.heading_body_written {
-            if let Some(Descriptor::Heading(level)) = self.stack.last() {
-                let opener = heading_prefix(*level);
-                if let Some(last) = self.result.last_mut() {
-                    if last.ends_with(opener) {
-                        last.truncate(last.len() - opener.len());
-                        carried_heading = Some(Descriptor::Heading(*level));
-                    }
-                }
-            }
-        }
+
+        let (carry_list_prefix, carry_list_prefix_newline) = self.take_dangling_list_prefix();
+        let carried_heading = self.take_dangling_heading();
 
         // When carrying a heading, temporarily pop so we don't write its closer here.
         if carried_heading.is_some() {
@@ -446,6 +426,55 @@ impl Converter {
             self.after_list_prefix = true;
             self.list_body_written = false;
         }
+    }
+
+    /// Trim trailing spaces and tabs from the current chunk.
+    fn trim_trailing_ws(&mut self) {
+        if let Some(last) = self.result.last_mut() {
+            while last.ends_with(' ') || last.ends_with('\t') {
+                last.pop();
+            }
+        }
+    }
+
+    /// If the current chunk ends with a list prefix that has no body yet,
+    /// remove and carry it over to the next chunk so markers never dangle.
+    fn take_dangling_list_prefix(&mut self) -> (Option<String>, bool) {
+        if self.after_list_prefix && !self.list_body_written {
+            let prefix = self.last_list_prefix.clone();
+            let mut carry_newline = false;
+            if let Some(last) = self.result.last_mut() {
+                let len = last.len();
+                if len >= prefix.len() {
+                    last.truncate(len - prefix.len());
+                }
+                while last.ends_with('\n') || last.ends_with('\r') {
+                    last.pop();
+                    carry_newline = true;
+                }
+            }
+            (Some(prefix), carry_newline)
+        } else {
+            (None, false)
+        }
+    }
+
+    /// Carry an unfinished heading opener into the next chunk to avoid splitting
+    /// immediately after the marker.
+    fn take_dangling_heading(&mut self) -> Option<Descriptor> {
+        if self.heading_body_written {
+            return None;
+        }
+        if let Some(Descriptor::Heading(level)) = self.stack.last() {
+            let opener = heading_prefix(*level);
+            if let Some(last) = self.result.last_mut() {
+                if last.ends_with(opener) {
+                    last.truncate(last.len() - opener.len());
+                    return Some(Descriptor::Heading(*level));
+                }
+            }
+        }
+        None
     }
 
     fn write_closers(&mut self) {
@@ -525,11 +554,11 @@ impl Converter {
                 debug_log!("Paragraph");
             }
             Tag::Heading { level, .. } => {
-                self.ensure_space_for_open(
+                self.ensure_space(SpaceBudget::for_open(
                     heading_prefix(level).len(),
                     heading_closer(level).len(),
                     1,
-                );
+                ));
 
                 self.new_line();
                 self.output(heading_prefix(level), false);
@@ -560,7 +589,7 @@ impl Converter {
                 // closing fence, and a little body headroom.
                 const MIN_CODE_BODY_HEADROOM: usize = 4;
                 let header_len = 3 + lang.len(); // "```" + lang
-                self.ensure_space_for_open(header_len, 3, MIN_CODE_BODY_HEADROOM);
+                self.ensure_space(SpaceBudget::for_open(header_len, 3, MIN_CODE_BODY_HEADROOM));
 
                 self.output("```", false);
                 self.output(&lang, true);
@@ -604,7 +633,7 @@ impl Converter {
                 }
                 let prefix = self.list_prefix();
                 // Avoid leaving the prefix at the end of the chunk with no body.
-                self.ensure_space_for_prefix(prefix.len(), 1);
+                self.ensure_space(SpaceBudget::for_prefix(prefix.len(), 1));
                 // Ensure the prefix fits; if not, split first.
                 let pending_prefix = self.pending_prefix_len();
                 let closers_len = self.closers_len(false);
@@ -650,21 +679,21 @@ impl Converter {
                 debug_log!("Superscript");
             }
             Tag::Emphasis => {
-                self.ensure_space_for_open(1, 1, 1);
+                self.ensure_space(SpaceBudget::for_open(1, 1, 1));
                 self.output("_", false);
                 self.stack.push(Descriptor::Emphasis);
 
                 debug_log!("Emphasis");
             }
             Tag::Strong => {
-                self.ensure_space_for_open(1, 1, 1);
+                self.ensure_space(SpaceBudget::for_open(1, 1, 1));
                 self.output("*", false);
                 self.stack.push(Descriptor::Strong);
 
                 debug_log!("Strong");
             }
             Tag::Strikethrough => {
-                self.ensure_space_for_open(2, 2, 1);
+                self.ensure_space(SpaceBudget::for_open(2, 2, 1));
                 self.output("~~", false);
                 self.stack.push(Descriptor::Strikethrough);
 
