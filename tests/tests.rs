@@ -159,7 +159,7 @@ fn keeps_angle_bracket_text_on_own_line() {
 
 #[test]
 fn converts_ordered_list_to_bullets() {
-    transform_expect_1("1. First\n2. Second", "⦁ First\n⦁ Second");
+    transform_expect_1("1. First\n2. Second", "1. First\n2. Second");
 }
 
 #[test]

@@ -710,17 +710,6 @@ impl Converter {
             TagEnd::List(_) => {
                 self.list = false;
                 if let Some(state) = self.list_stack.pop() {
-                    if state.ordered && state.items.len() > 1 {
-                        // Convert ordered prefixes to bullets when the list has multiple items.
-                        for marker in state.items.iter().cloned().rev() {
-                            let chunk = &mut self.result[marker.chunk_idx];
-                            let indent = " ".repeat(marker.indent_len);
-                            chunk.replace_range(
-                                marker.start..marker.end,
-                                format!("{indent}⦁ ").as_str(),
-                            );
-                        }
-                    }
                     // If we just closed a single-item ordered list, consider the next
                     // top-level list as nested one level deeper (common in docs).
                     if state.ordered && state.items.len() == 1 && self.list_stack.is_empty() {

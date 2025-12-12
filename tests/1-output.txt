@@ -14,8 +14,8 @@ Given:
 
 You want to:
 
-⦁ Produce a *summary of the whole conversation* that fits in the LLM’s context, and/or
-⦁ Keep chatting with the user while the LLM still has access to relevant past information, *even after* the raw history no longer fits\.
+1. Produce a *summary of the whole conversation* that fits in the LLM’s context, and/or
+2. Keep chatting with the user while the LLM still has access to relevant past information, *even after* the raw history no longer fits\.
 
 You cannot just send the whole conversation; instead you:
 
@@ -470,30 +470,30 @@ You send this \(or an equivalent structured version\) as context to the LLM, ens
 
 *⭐ 5\. Core Rules to Remember*
 
-⦁ *Never send the full raw conversation once it’s large\.*
+1. *Never send the full raw conversation once it’s large\.*
 Always send:
 
   ⦁ A compressed long‑term memory,
   ⦁ A recent window of raw messages\.
 
-⦁ *Use the LLM*===*in several passes:*
+2. *Use the LLM*===*in several passes:*
 
   ⦁ Chunk‑level summarization,
   ⦁ Hierarchical compression \(if needed\),
   ⦁ Memory creation,
   ⦁ Memory updates\.
 
-⦁ *Prompts must be explicit and structured\.*
+3. *Prompts must be explicit and structured\.*
 Say exactly:
 
   ⦁ What to keep \(goals, constraints, facts, decisions, open questions\),
   ⦁ What to drop \(small talk, repetition, incidental details\),
   ⦁ How long the output can be\.
 
-⦁ *Always hard‑cap memory size\.*
+4. *Always hard‑cap memory size\.*
 Re‑compress memory when it gets large by feeding it back into an “update/compress yourself” prompt\.
 
-⦁ *Summarize earlier, not at the last second\.*
+5. *Summarize earlier, not at the last second\.*
 Start summarizing when context is around 60–70% full, leaving breathing room\.
 
 ————————
