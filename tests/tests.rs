@@ -218,20 +218,20 @@ fn converts_blockquote_heading_and_list_item() {
     transform_expect_1(input, expected);
 }
 
-// #[test]
-// fn splits_words_to_fit_len_5() {
-//     transform_expect_n("12345 12345", "12345===12345", 5);
-// }
+#[test]
+fn splits_words_to_fit_len_5() {
+    transform_expect_n("12345 12345", "12345===12345", 5);
+}
 
-// #[test]
-// fn splits_words_to_fit_len_10() {
-//     transform_expect_n("12345 12345", "12345===12345", 10);
-// }
+#[test]
+fn splits_words_to_fit_len_10() {
+    transform_expect_n("12345 12345", "12345===12345", 10);
+}
 
-// #[test]
-// fn keeps_words_when_len_allows() {
-//     transform_expect_n("12345 12345", "12345 12345", 11);
-// }
+#[test]
+fn keeps_words_when_len_allows() {
+    transform_expect_n("12345 12345", "12345 12345", 11);
+}
 
 #[test]
 fn splits_code_block_line_len_18() {
