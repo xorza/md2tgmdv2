@@ -1,6 +1,4 @@
-#![allow(unused_imports)]
-
-use md2tgmdv2::{Converter, TELEGRAM_BOT_MAX_MESSAGE_LENGTH};
+use md2tgmdv2::Converter;
 
 fn transform_expect_1(input: &str, expected: &str) {
     let chunks = Converter::default().go(input).unwrap();

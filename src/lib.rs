@@ -3,11 +3,8 @@
 //! Public entry point is [`transform`]. It renders Markdown into Telegram‑safe
 //! MarkdownV2 and splits the result into chunks that fit the provided limit.
 
-#![allow(unused_imports)]
-
 use anyhow::anyhow;
 use pulldown_cmark::{CodeBlockKind, Event, HeadingLevel, Options, Parser, Tag, TagEnd};
-use std::ops::Range;
 
 /// Telegram MarkdownV2 message hard limit.
 pub const TELEGRAM_BOT_MAX_MESSAGE_LENGTH: usize = 4096;
@@ -179,8 +176,6 @@ impl Converter {
         if !self.stack.is_empty() {
             return Err(anyhow!("Unbalanced tags"));
         }
-        
-        
 
         Ok(std::mem::take(&mut self.result))
     }
@@ -694,7 +689,6 @@ fn descriptor_closer(desc: &Descriptor) -> &'static str {
         Descriptor::CodeBlock(_) => "```",
     }
 }
-
 
 /// Escape Telegram MarkdownV2 control characters into the provided buffer.
 fn push_escaped(out: &mut String, text: &str) {
