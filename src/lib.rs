@@ -172,26 +172,117 @@ impl Converter {
         }
     }
     fn output(&mut self, txt: &str, escape: bool) {
-        let last = self.result.last_mut().unwrap();
+        let owned = if escape {
+            escape_text(txt)
+        } else {
+            txt.to_string()
+        };
 
+        let mut remaining = owned.as_str();
+        while !remaining.is_empty() {
+            // Reserve room for pending prefix and required closers so we never
+            // overflow the chunk once we have to emit closing markers.
+            let pending_prefix = self.pending_prefix_len();
+            let closers_len = self.closers_len();
+            let current_len = self.result.last().map(|s| s.len()).unwrap_or(0);
+
+            if current_len + pending_prefix + closers_len >= self.max_len {
+                self.split_chunk();
+                continue;
+            }
+
+            let available = self.max_len - current_len - pending_prefix - closers_len;
+            if available == 0 {
+                self.split_chunk();
+                continue;
+            }
+
+            let take = split_point(remaining, available);
+            let (part, rest) = remaining.split_at(take);
+
+            self.flush_pending_prefix();
+
+            let last = self.result.last_mut().unwrap();
+            last.push_str(part);
+
+            remaining = rest;
+
+            if !remaining.is_empty() {
+                // We still have content left; close and reopen formatting for the next chunk.
+                self.split_chunk();
+            }
+        }
+    }
+
+    /// Number of prefix characters that would be inserted before the next write.
+    fn pending_prefix_len(&self) -> usize {
+        let mut len = 0;
         if self.add_new_line {
-            last.push_str("\n");
+            len += 1; // the newline itself
+            if self.quote_level > 0 {
+                len += self.quote_level as usize;
+            }
+        } else if self.result.last().map(|s| s.is_empty()).unwrap_or(true) && self.quote_level > 0 {
+            len += self.quote_level as usize;
+        }
+
+        len
+    }
+
+    /// Emit any pending newline and quote prefix.
+    fn flush_pending_prefix(&mut self) {
+        let last = self.result.last_mut().unwrap();
+        if self.add_new_line {
+            last.push('\n');
             if self.quote_level > 0 {
                 last.push_str(&">".repeat(self.quote_level as usize));
             }
             self.add_new_line = false;
-        }
-
-        if last.is_empty() && self.quote_level > 0 {
+        } else if last.is_empty() && self.quote_level > 0 {
             last.push_str(&">".repeat(self.quote_level as usize));
         }
+    }
 
-        if escape {
-            let escaped = escape_text(&txt);
-            last.push_str(&escaped);
-        } else {
-            last.push_str(txt);
+    fn split_chunk(&mut self) {
+        self.write_closers();
+        self.result.push(String::new());
+        self.reopen_descriptors();
+    }
+
+    fn write_closers(&mut self) {
+        if self.stack.is_empty() {
+            return;
         }
+        let closers: Vec<&str> = self.stack.iter().rev().map(descriptor_closer).collect();
+        let last = self.result.last_mut().unwrap();
+        for closer in closers {
+            last.push_str(closer);
+        }
+    }
+
+    fn reopen_descriptors(&mut self) {
+        if self.stack.is_empty() {
+            return;
+        }
+        // Clone to avoid holding an immutable borrow while writing.
+        let descriptors = self.stack.clone();
+        for desc in descriptors {
+            match desc {
+                Descriptor::Strong => self.output("**", false),
+                Descriptor::Emphasis => self.output("_", false),
+                Descriptor::Strikethrough => self.output("~~", false),
+                Descriptor::Code => self.output("`", false),
+                Descriptor::CodeBlock(lang) => {
+                    self.output("```", false);
+                    self.output(&lang, true);
+                    self.add_new_line = true;
+                }
+            }
+        }
+    }
+
+    fn closers_len(&self) -> usize {
+        self.stack.iter().map(descriptor_closer).map(str::len).sum()
     }
 
     fn start_tag(&mut self, tag: Tag) -> anyhow::Result<()> {
@@ -423,6 +514,35 @@ impl Converter {
         Ok(())
     }
 }
+
+fn split_point(text: &str, max_len: usize) -> usize {
+    if text.len() <= max_len {
+        return text.len();
+    }
+
+    let mut last_space = None;
+    for (idx, ch) in text.char_indices() {
+        if idx >= max_len {
+            break;
+        }
+        if ch.is_whitespace() {
+            last_space = Some(idx + ch.len_utf8());
+        }
+    }
+
+    last_space.unwrap_or(max_len)
+}
+
+fn descriptor_closer(desc: &Descriptor) -> &'static str {
+    match desc {
+        Descriptor::Strong => "**",
+        Descriptor::Emphasis => "_",
+        Descriptor::Strikethrough => "~~",
+        Descriptor::Code => "`",
+        Descriptor::CodeBlock(_) => "```",
+    }
+}
+
 fn escape_text(text: &str) -> String {
     // Single pass escape to avoid O(n*k) replace chaining.
     let mut out = String::with_capacity(text.len() * 2); // worst case every char escapes

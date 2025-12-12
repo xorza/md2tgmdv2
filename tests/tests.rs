@@ -233,14 +233,14 @@ fn converts_blockquote_heading_and_list_item() {
 //     transform_expect_n("12345 12345", "12345 12345", 11);
 // }
 
-// #[test]
-// fn splits_code_block_line_len_18() {
-//     transform_expect_n(
-//         "```\n1234567890\n1234567890\n```",
-//         "```\n1234567890\n```===```\n1234567890\n```",
-//         18,
-//     );
-// }
+#[test]
+fn splits_code_block_line_len_18() {
+    transform_expect_n(
+        "```\n1234567890\n1234567890\n```",
+        "```\n1234567890\n```===```\n1234567890\n```",
+        18,
+    );
+}
 
 // #[test]
 // fn splits_code_block_line_len_19() {
