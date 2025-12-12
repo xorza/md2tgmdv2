@@ -478,6 +478,23 @@ impl Converter {
                     CodeBlockKind::Fenced(lang) => lang.to_string(),
                     CodeBlockKind::Indented => String::new(),
                 };
+
+                // If we're close to the chunk boundary, start the code block
+                // on a fresh chunk so we don't end up force‑splitting the first
+                // line of code mid‑word. Reserve space for the opening fence,
+                // closing fence, and a little body headroom.
+                const MIN_CODE_BODY_HEADROOM: usize = 4;
+                let current_len = self.result.last().map(|s| s.len()).unwrap_or(0);
+                let pending_prefix = self.pending_prefix_len();
+                let header_len = 3 + lang.len(); // "```" + lang
+                let closers_len = 3; // closing "```"
+                let remaining_after_structure = self
+                    .max_len
+                    .saturating_sub(current_len + pending_prefix + header_len + closers_len);
+                if current_len > 0 && remaining_after_structure < MIN_CODE_BODY_HEADROOM {
+                    self.split_chunk();
+                }
+
                 self.output("```", false);
                 self.output(&lang, true);
                 self.add_new_line = true;
