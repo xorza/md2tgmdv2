@@ -7,18 +7,15 @@ Below is a concrete recipe, written so you can implement it\.
 *⭐ 1\. What You’re Trying To Achieve*
 
 Given:
-
 ⦁ A long conversation: a list like
 `messages \= \[\{role: "user"\|"assistant", content: string\}, …\]`
 ⦁ An LLM with a fixed context limit \(token budget\), e\.g\. 8k / 16k / 32k / 128k tokens\.
 
 You want to:
-
 1\. Produce a *summary of the whole conversation* that fits in the LLM’s context, and/or
 2\. Keep chatting with the user while the LLM still has access to relevant past information, *even after* the raw history no longer fits\.
 
 You cannot just send the whole conversation; instead you:
-
 ⦁ *Split* it into chunks that fit;
 ⦁ *Summarize* each chunk using the LLM;
 ⦁ Optionally *summarize those summaries* \(hierarchical\);
@@ -31,28 +28,21 @@ You cannot just send the whole conversation; instead you:
 You must pick explicit numbers, not guess\.
 
 Assume:
-
 ⦁ `MODEL\_CONTEXT\_TOKENS` \= max tokens your LLM can accept \(say 16,000\)\.
 
 Define:
-
 ⦁ `MAX\_CHUNK\_TOKENS` — maximum tokens of _conversation text_ you send in a _single summarization_ call\.
 Example: `MAX\_CHUNK\_TOKENS \= 3\_000`\.
-
 ⦁ `TARGET\_CHUNK\_SUMMARY\_TOKENS` — target size of each first‑level summary\.
 Example: `300`\.
-
 ⦁ `TARGET\_GROUP\_SUMMARY\_TOKENS` — target size of each higher‑level summary\.
 Example: `400`\.
-
 ⦁ `TARGET\_GLOBAL\_SUMMARY\_TOKENS` — target size of final conversation summary\.
 Example: `800–1\_200`\.
 
 For ongoing chat, also:
-
 ⦁ `MEMORY\_TOKEN\_LIMIT` — max size of long‑term memory\.
 Example: `600`\.
-
 ⦁ `RECENT\_WINDOW\_TOKEN\_LIMIT` — how many tokens of raw “recent” conversation you aim to keep\.
 Example: `3\_000`\.
 
@@ -115,7 +105,6 @@ function chunk\_messages\(messages, max\_chunk\_tokens\):
 ```
 
 Notes:
-
 ⦁ You always cut at *message boundaries*\.
 ⦁ `summarize\_single\_long\_message\_with\_llm` is just a one‑off “summarize this text” call\.
 
@@ -131,8 +120,7 @@ For each chunk, call the LLM with a strict summarization prompt\.
 >
 >Your goal is to produce a short but highly informative summary that can replace the raw messages in future prompts\.
 >
->*INCLUDE \(only if present*===>*and important\):*
->
+>*INCLUDE \(only if present and*===>*important\):*
 >⦁ Main user questions, tasks, and goals in this segment
 >⦁ Important facts, constraints, and preferences the user states \(deadlines, environment, skill level, likes/dislikes, etc\.\)
 >⦁ Key explanations, designs, solution ideas, and reasoning from the assistant \(described concisely in words; avoid large code blocks\)
@@ -140,13 +128,11 @@ For each chunk, call the LLM with a strict summarization prompt\.
 >⦁ Any explicit open questions or TODO items mentioned
 >
 >*EXCLUDE OR MINIMIZE:*
->
 >⦁ Greetings, small talk, and filler conversation
 >⦁ Repetitive text that adds no new information
 >⦁ Very low‑level intermediate steps or details unlikely to matter later
 >
 >*OUTPUT FORMAT \(plain text, no JSON, no code fences\):*
->
 >⦁ Topics: bullet list of the main topics discussed\.
 >⦁ User Goals: bullet list of what the user wanted or asked for in this segment\.
 >⦁ Key Facts: bullet list of important facts, constraints, or preferences\.
@@ -155,7 +141,6 @@ For each chunk, call the LLM with a strict summarization prompt\.
 >⦁ Open Questions / TODOs: bullet list of unresolved issues or future steps\.
 >
 >*LENGTH LIMIT:*
->
 >⦁ Maximum 300 tokens\. Be concise and information‑dense\.
 >
 >Now summarize the following conversation segment:
@@ -207,7 +192,6 @@ Each `group` will be converted into a higher‑level summary\.
 >A list of summaries, in chronological order, each summarizing a segment of a long user–assistant conversation\.
 >
 >*GOAL:*
->
 >⦁ Merge overlapping and redundant information\.
 >⦁ Preserve important, persistent information about:
 >  ⦁ user goals, preferences, constraints, and profile
@@ -216,11 +200,9 @@ Each `group` will be converted into a higher‑level summary\.
 >  ⦁ important decisions and outcomes
 >  ⦁ long‑running tasks or projects and their progress
 >  ⦁ important unresolved questions or TODOs
->
 >⦁ Provide a sense of how the conversation evolved across these segments\.
 >
 >*OUTPUT FORMAT \(plain text, no JSON\):*
->
 >⦁ High‑Level Themes: bullet list of dominant themes/topics across all segments\.
 >⦁ Timeline / Phases: numbered list where each item briefly describes a phase \(what the user wanted, what the assistant did, key changes or progress\)\.
 >⦁ Persistent User Info: bullet list of stable user profile info or preferences seen here\.
@@ -228,12 +210,11 @@ Each `group` will be converted into a higher‑level summary\.
 >⦁ Open Issues / TODOs: bullet list of unresolved questions or tasks left after these segments\.
 >
 >*LENGTH LIMIT:*
->
 >⦁ Maximum 400 tokens\. Aggressively remove repetition and low‑value detail\.
 >
->Now compress the following summaries into one higher‑level===>summary:
+>Now compress the following summaries into one higher‑level summary:
 >
->\[BEGIN SUMMARIES\]
+>\[BEGIN===>SUMMARIES\]
 ><insert the chunk summaries here, separated and in order\>
 >\[END SUMMARIES\]
 
@@ -248,7 +229,6 @@ for group in groups:
 ```
 
 If the list `group\_summaries` is still too long in total:
-
 ⦁ Treat `group\_summaries` as the new “chunk\_summaries”\.
 ⦁ Repeat: group them, compress again\.
 ⦁ Continue until you can fit everything into *one global summary* of ≤ `TARGET\_GLOBAL\_SUMMARY\_TOKENS`\.
@@ -270,25 +250,21 @@ Now you have a global textual summary\. Turn it into a small, structured memory 
 >Convert this into a structured memory that contains only information likely to be useful in future conversation turns\.
 >
 >Focus on:
->
 >⦁ Who the user is \(skills, preferences, constraints, relevant background\)
 >⦁ Main projects, tasks, or topics and their status
 >⦁ Important decisions, conclusions, designs, or facts that should not be forgotten
 >⦁ Unresolved questions or TODOs that might be revisited later
 >
 >Ignore:
->
 >⦁ Transient details, minor side comments, throwaway examples, and small talk
 >
 >*OUTPUT FORMAT \(plain text, no JSON\):*
->
 >⦁ User Profile: bullet list of what we know about the user \(skills, preferences, constraints, etc\.\)\.
 >⦁ Projects / Topics: bullet list of the main projects or topics and their current status\.
 >⦁ Key Decisions / Facts: bullet list of core facts, designs, or conclusions that matter later\.
 >⦁ Open Questions / TODOs: bullet list of unresolved issues or planned next steps\.
 >
 >*LENGTH LIMIT:*
->
 >⦁ Maximum 600 tokens\. Be very selective and concise\.
 >
 >Now produce the long‑term memory from the following summary:
@@ -304,7 +280,6 @@ The model’s output is your `long\_term\_memory` string: a compressed represent
 *⭐ 4\. Online: Keep Summarizing As You Chat*
 
 When conversation keeps growing, you need a *rolling* solution:
-
 ⦁ Maintain:
   ⦁ a small `long\_term\_memory` \(bounded text\), and
   ⦁ a list of `recent\_messages` \(raw most recent turns\)\.
@@ -345,8 +320,8 @@ function handle\_user\_message\(user\_text\):
                 new\_summary \= segment\_summary
             \)
 
-    \#```===```pseudo
-4\. Build final prompt using updated memory \+ remaining recent messages
+    \# 4\. Build final prompt using```===```pseudo
+updated memory \+ remaining recent messages
     prompt \= build\_answer\_prompt\(
         long\_term\_memory \= state\.long\_term\_memory,
         recent\_messages \= state\.recent\_messages
@@ -364,7 +339,6 @@ function handle\_user\_message\(user\_text\):
 *✨ 4\.3\. Selecting Which Old Messages to Summarize*
 
 Simple policy:
-
 ⦁ Always keep the last `K` messages raw,
 ⦁ Summarize everything older, up to a token limit\.
 ```pseudo
@@ -402,32 +376,27 @@ You merge `segment\_summary` into existing `long\_term\_memory` with another LLM
 >
 >*TASK:*
 >Update CURRENT\_MEMORY so that it:
->
 >⦁ Adds any new, important long‑term information from NEW\_INFORMATION\.
 >⦁ Updates or corrects information that has clearly changed\.
 >⦁ Optionally removes or shrinks details that are now obsolete or clearly unimportant\.
 >
 >Focus on:
->
 >⦁ Persistent user preferences, constraints, and profile info
 >⦁ On‑going projects, tasks, or topics and their updated status
 >⦁ Important decisions, designs, or conclusions that will matter later
 >⦁ Open questions or TODOs that might be revisited
 >
 >Ignore or minimize:
->
 >⦁ Transient details, one‑off examples, and minor small talk
 >
 >*OUTPUT:*
 >Return the UPDATED\_MEMORY only, in this structure \(plain text\):
->
 >⦁ User Profile
 >⦁ Projects / Topics
 >⦁ Key Decisions / Facts
 >⦁ Open Questions / TODOs
 >
 >*LENGTH LIMIT:*
->
 >⦁ Maximum 600 tokens\. Compress aggressively and drop low‑importance details if necessary\.
 
 Implementation:
@@ -439,7 +408,6 @@ function update\_memory\(current\_memory, new\_summary\):
 ```
 
 This keeps `long\_term\_memory`:
-
 ⦁ Under `MEMORY\_TOKEN\_LIMIT`, and
 ⦁ Reflecting the whole conversation so far\.
 
@@ -469,34 +437,29 @@ You send this \(or an equivalent structured version\) as context to the LLM, ens
 ————————
 
 *⭐ 5\. Core Rules to Remember*
-
-1\. *Never send the full raw conversation once it’s large\.*
+1\. 
+*Never send the full raw conversation once it’s large\.*
 Always send:
   ⦁ A compressed long‑term memory,
   ⦁ A recent window of raw messages\.
-
-2\. *Use the LLM*===*in several passes:*
-  ⦁ Chunk‑level summarization,
+2\. *Use the LLM in several passes:*
+  ⦁ Chunk‑level===summarization,
   ⦁ Hierarchical compression \(if needed\),
   ⦁ Memory creation,
   ⦁ Memory updates\.
-
 3\. *Prompts must be explicit and structured\.*
 Say exactly:
   ⦁ What to keep \(goals, constraints, facts, decisions, open questions\),
   ⦁ What to drop \(small talk, repetition, incidental details\),
   ⦁ How long the output can be\.
-
 4\. *Always hard‑cap memory size\.*
 Re‑compress memory when it gets large by feeding it back into an “update/compress yourself” prompt\.
-
 5\. *Summarize earlier, not at the last second\.*
 Start summarizing when context is around 60–70% full, leaving breathing room\.
 
 ————————
 
 If you tell me:
-
 ⦁ Which model you’re actually using \(and its context length\),
 ⦁ What language you’re coding in,
 

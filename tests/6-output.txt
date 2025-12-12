@@ -7,30 +7,24 @@ Below is a very specific, verbose, implementable approach\.
 *⭐ 1\) Start With Hard Numbers \(Budgets You Enforce\)*
 
 You need _explicit_ token budgets\. Assume your model has:
-
 ⦁ `MODEL\_CONTEXT\_TOKENS` \(example: 16,000\)
 
 You must reserve tokens for:
-
 1\. *Model output \(the answer\)*
   ⦁ `RESERVED\_OUTPUT\_TOKENS` \(example: 1,000–2,000\)
-
 2\. *Prompt overhead* \(system prompt \+ formatting \+ tool descriptions\)
   ⦁ `RESERVED\_OVERHEAD\_TOKENS` \(example: 500–1,500\)
 
 Then your maximum safe input is:
-
 ⦁ `MAX\_INPUT\_TOKENS \= MODEL\_CONTEXT\_TOKENS \- RESERVED\_OUTPUT\_TOKENS \- RESERVED\_OVERHEAD\_TOKENS`
 
 Example:
-
 ⦁ `MODEL\_CONTEXT\_TOKENS \= 16000`
 ⦁ `RESERVED\_OUTPUT\_TOKENS \= 1500`
 ⦁ `RESERVED\_OVERHEAD\_TOKENS \= 800`
 ⦁ `MAX\_INPUT\_TOKENS \= 13700`
 
 Now define chunk budgets:
-
 ⦁ `MAX\_CHUNK\_TOKENS` \(input per summarization call\): 2,500–4,000
 Example: `3000`
 ⦁ `TARGET\_CHUNK\_SUMMARY\_TOKENS`: 250–500
@@ -60,7 +54,6 @@ Represent each message as a record:
 ```
 
 Why IDs matter:
-
 ⦁ You can track exactly which messages are covered by which chunk summary\.
 ⦁ You can later re\-summarize only part of the history if needed\.
 ⦁ You can do retrieval \(“give me the chunk summary that covers message 120”\)\.
@@ -112,18 +105,16 @@ function chunk\_messages\(messages, MAX\_CHUNK\_TOKENS\):
 ```
 
 *✨ Important edge cases you must handle*
-
 ⦁ *Oversized single message* \(user pasted a huge log\): summarize it alone first\.
 ⦁ *Never split inside a message* unless you have a special “split by paragraphs then summarize” routine\.
 
 ————————
 
-*⭐ 4\)=== Step B — Summarize Each Chunk With a Strict Schema*
+*⭐ 4\) Step B===— Summarize Each Chunk With a Strict Schema*
 
 *✨ Why strict schema matters*
 
 If you just say “summarize,” the model may produce a narrative that loses:
-
 ⦁ constraints
 ⦁ key decisions
 ⦁ TODOs
@@ -140,7 +131,6 @@ Use this _for every chunk_:
 >PURPOSE: Create a compact, information\-dense summary that can replace the raw messages in future prompts\.
 >
 >MUST INCLUDE \(only if present and important\):
->
 >⦁ User goals/questions/tasks introduced or progressed in this segment
 >⦁ Key facts and constraints \(numbers, deadlines, environment, tool versions, file paths, commands\)
 >⦁ Assistant’s substantive contributions \(plans, reasoning, proposed architecture, fixes\) described concisely
@@ -148,12 +138,10 @@ Use this _for every chunk_:
 >⦁ Open questions / TODOs created or left unresolved
 >
 >MUST EXCLUDE OR MINIMIZE:
->
 >⦁ Greetings, filler, politeness, repetition
 >⦁ Detail that does not affect decisions or future work
 >
 >OUTPUT FORMAT \(plain text, no JSON, no code fences\):
->
 >⦁ Topics:
 >⦁ User Goals:
 >⦁ Key Facts / Constraints:
@@ -189,7 +177,6 @@ If you have many chunk summaries, they may still exceed your global budget\.
 *✨ 5\.1 Grouping*
 
 Choose group size so the input fits:
-
 ⦁ If chunk summaries are \~350 tokens, `group\_size \= 8–10` is typical\.
 
 Pseudocode:
@@ -206,7 +193,6 @@ function group\_items\(items, group\_size\):
 >You are compressing multiple chunk summaries of a conversation into one higher\-level summary\.
 >
 >GOAL: Merge redundancy while preserving durable, decision\-relevant information:
->
 >⦁ Stable user profile/preferences/constraints
 >⦁ Major solutions/architectures and why they were chosen
 >⦁ Key decisions/outcomes
@@ -214,7 +200,6 @@ function group\_items\(items, group\_size\):
 >⦁ Remaining open questions/TODOs
 >
 >OUTPUT FORMAT:
->
 >⦁ Themes:
 >⦁ Timeline / Phases \(1–N\):
 >⦁ Persistent Facts / Preferences:
@@ -232,17 +217,14 @@ Run this for each group → you get *second\-level summaries*\.
 *✨ 5\.3 Repeat if necessary*
 
 If second\-level summaries still don’t fit:
-
 ⦁ group them again
 ⦁ summarize again
 
 Until you have either:
-
 ⦁ one global summary, or
 ⦁ a small set of global summaries that together fit your target\.
 
 This is a summarization “tree”:
-
 ⦁ raw messages → chunk summaries → group summaries → global summary
 
 ————————
@@ -256,15 +238,13 @@ Now take the global summary and convert it into a *memory* you can inject into f
 >Convert the following conversation summary into a long\-term memory for future turns\.
 >
 >Keep only information likely to matter later:
->
 >⦁ User profile \(skill level, preferences, constraints\)
->⦁ Environment constraints \(OS,===>tooling, languages, repos\)
+>⦁ Environment constraints \(OS, tooling, languages,===>repos\)
 >⦁ Ongoing projects and current status
 >⦁ Key decisions and short rationale
 >⦁ Open questions / TODOs
 >
 >Output format:
->
 >⦁ User Profile:
 >⦁ Preferences:
 >⦁ Constraints / Environment:
@@ -285,7 +265,6 @@ Store this as `long\_term\_memory`\.
 *⭐ 7\) Live / Ongoing Chat: Rolling Memory Updates \(So You Don’t Re\-Summarize Everything\)*
 
 In a live system, you keep two things:
-
 1\. `long\_term\_memory` \(bounded, e\.g\. ≤ 600 tokens\)
 2\. `recent\_messages` \(raw, e\.g\. last 3,000 tokens\)
 
@@ -326,13 +305,11 @@ Use a dedicated prompt to merge and also keep memory small:
 ><segment summary\>
 >
 >Update the memory by:
->
 >⦁ Adding important persistent info
 >⦁ Updating/overwriting info that changed
 >⦁ Removing low\-value/obsolete details to stay under the size limit
 >
 >OUTPUT the UPDATED MEMORY ONLY in this format:
->
 >⦁ User Profile:
 >⦁ Preferences:
 >⦁ Constraints / Environment:
@@ -343,7 +320,6 @@ Use a dedicated prompt to merge and also keep memory small:
 >HARD LENGTH LIMIT: ≤ 600 tokens\.
 
 Then:
-
 ⦁ replace `long\_term\_memory` with the updated memory
 ⦁ delete the summarized raw messages from `recent\_messages`
 
@@ -354,12 +330,10 @@ Now you’re back under budget\.
 *⭐ 8\) Retrieval \(Optional but Often Best\)*
 
 If you want higher accuracy than a single “memory blob”:
-
 1\. Store *chunk summaries* and compute embeddings for each\.
 2\. When a new user question arrives:
   ⦁ embed the question
   ⦁ retrieve top\-K most relevant chunk summaries
-
 3\. Build prompt with:
   ⦁ system message
   ⦁ long\_term\_memory
@@ -373,7 +347,6 @@ This gives “selective recall” without expanding context endlessly\.
 *⭐ 9\) Prompt Assembly Pattern \(What You Actually Send When Answering\)*
 
 A robust final prompt for answering looks like:
-
 1\. System instructions
 2\. Long\-term memory \(≤ 600 tokens\)
 3\. Retrieved relevant past summaries \(≤ 1–2k tokens total\)
@@ -385,23 +358,19 @@ This scales indefinitely because every component has a hard cap\.
 ————————
 
 *⭐ 10\) Common Failure Modes \(And Fixes\)*
-
-1\. *Summary loses important numbers/commands*
+1\. 
+*Summary loses important numbers/commands*
 Fix: explicitly instruct “preserve all numbers, file paths, commands, API names\.”
-
 2\. *Memory grows without bound*
 Fix: enforce strict memory token limit and require dropping low\-value details\.
-
 3\. *Summaries become too vague*
 Fix: demand a schema with “Key Facts/Constraints” and “Decisions” and “TODOs”\.
-
 4\. *You overflow anyway*
 Fix: trigger summarization earlier \(at 60–70% usage\), not at 95–100%\.
 
 ————————
 
 If you tell me:
-
 ⦁ which model you’re using and its context size, and
-⦁ whether you need offline===summarization or live rolling memory,
-I can recommend exact budget numbers \(chunk size, summary size, trigger thresholds\) that typically work well for that setup\.
+⦁ whether you need offline summarization or live rolling memory,
+I can===recommend exact budget numbers \(chunk size, summary size, trigger thresholds\) that typically work well for that setup\.

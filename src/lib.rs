@@ -24,6 +24,7 @@ pub struct Converter {
     result: Vec<String>,
     stack: Vec<Descriptor>,
     add_new_line: bool,
+    after_heading: bool,
     quote_level: u8,
     list: bool, // Deprecated; kept for backward compatibility, not used.
     list_stack: Vec<ListState>,
@@ -52,6 +53,7 @@ impl Default for Converter {
             result: vec![],
             stack: Vec::new(),
             add_new_line: false,
+            after_heading: false,
             quote_level: 0,
             list: false,
             list_stack: Vec::new(),
@@ -479,10 +481,10 @@ impl Converter {
         }
         match tag {
             Tag::Paragraph => {
-                // When a paragraph begins right after a list prefix, keep it
-                // on the same line to avoid stray blank lines between the marker
-                // and the first line of text.
-                if self.after_list_prefix {
+                if self.after_heading {
+                    self.new_line();
+                    self.after_heading = false;
+                } else if self.after_list_prefix {
                     self.after_list_prefix = false;
                 } else {
                     self.new_line();
@@ -566,8 +568,10 @@ impl Converter {
                     // When starting a nested list item right after text, consume
                     // the pending newline instead of emitting an extra blank line.
                     self.flush_pending_prefix();
+                    self.add_new_line = false;
                 } else {
                     self.new_line();
+                    self.add_new_line = false;
                 }
                 let (prefix, indent_len) = self.list_prefix();
                 // Ensure the prefix fits; if not, split first.
@@ -696,6 +700,7 @@ impl Converter {
                     HeadingLevel::H6 => self.output_closing("_", false),
                 }
                 self.add_new_line = true;
+                self.after_heading = true;
 
                 debug_log!("EndHeading");
             }

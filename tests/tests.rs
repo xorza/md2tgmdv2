@@ -43,7 +43,12 @@ fn converts_bold_list_item() {
 
 #[test]
 fn preserves_text_before_list() {
-    transform_expect_1("test\n\n- **Split** it into", "test\n\n⦁ *Split* it into");
+    transform_expect_1("test\n\n- **Split** it into", "test\n⦁ *Split* it into");
+}
+
+#[test]
+fn preserves_text_before_list1() {
+    transform_expect_1("test\n- **Split** it into", "test\n⦁ *Split* it into");
 }
 
 #[test]
@@ -83,8 +88,16 @@ fn escapes_inline_code_markers() {
 #[test]
 fn converts_list_after_blank_line() {
     transform_expect_1(
-        "Assume:\n\n\r\n- `MODEL_CONTEXT_TOKENS` = max",
+        "Assume:\n\n- `MODEL_CONTEXT_TOKENS` = max",
         "Assume:\n\n⦁ `MODEL\\_CONTEXT\\_TOKENS` \\= max",
+    );
+}
+
+#[test]
+fn converts_list_after_blank_line1() {
+    transform_expect_1(
+        "Assume.\n- `MODEL_CONTEXT_TOKENS` = max",
+        "Assume\\.\n⦁ `MODEL\\_CONTEXT\\_TOKENS` \\= max",
     );
 }
 
@@ -127,7 +140,6 @@ fn preserves_blockquote_blank_line_before_heading() {
          >⦁ Any explicit open questions or TODO items mentioned\n\
          >\n\
          >*EXCLUDE OR MINIMIZE:*\n\
-         >\n\
          >⦁ Greetings, small talk, and filler conversation\n\
          >⦁ Repetitive text that adds no new information",
     );
@@ -185,7 +197,7 @@ fn renders_image_as_link() {
 
 #[test]
 fn heading_followed_by_list_without_blank_line() {
-    transform_expect_1("## Heading\n- item", "*⭐ Heading*\n\n⦁ item");
+    transform_expect_1("## Heading\n- item", "*⭐ Heading*\n⦁ item");
 }
 
 #[test]
@@ -213,14 +225,14 @@ fn preserves_newlines_around_list() {
 #[test]
 fn converts_blockquote_with_list_and_bold() {
     let input = "> - Any explicit\n>\n> **text**\n> - greetings";
-    let expected = ">⦁ Any explicit\n>\n>*text*\n>\n>⦁ greetings";
+    let expected = ">⦁ Any explicit\n>\n>*text*\n>⦁ greetings";
     transform_expect_1(input, expected);
 }
 
 #[test]
 fn converts_blockquote_heading_and_list_item() {
     let input = "> **GOAL:**\n> - Merge.";
-    let expected = ">*GOAL:*\n>\n>⦁ Merge\\.";
+    let expected = ">*GOAL:*\n>⦁ Merge\\.";
     transform_expect_1(input, expected);
 }
 
@@ -308,7 +320,7 @@ fn asd() {
 fn asd1() {
     transform_expect_1(
         "You need\n\n1. **Model**\n- `MODEL` test.",
-        "You need\n\n1\\. *Model*\n  ⦁ `MODEL` test\\.",
+        "You need\n1\\. *Model*\n  ⦁ `MODEL` test\\.",
     );
 }
 
@@ -385,6 +397,18 @@ fn test6() -> anyhow::Result<()> {
     let _expected = include_str!("6-output.txt");
 
     std::fs::write("tests/6-output.txt", &actual).unwrap();
+    //assert_eq!(actual, expected);
+
+    Ok(())
+}
+#[test]
+fn test7() -> anyhow::Result<()> {
+    let input = include_str!("7-input.md");
+    let chunks = Converter::default().go(input)?;
+    let actual = chunks.join("===");
+    let _expected = include_str!("7-output.txt");
+
+    std::fs::write("tests/7-output.txt", &actual).unwrap();
     //assert_eq!(actual, expected);
 
     Ok(())

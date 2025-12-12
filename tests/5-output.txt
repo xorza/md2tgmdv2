@@ -7,30 +7,24 @@ Below is a very specific, verbose, implementable approach\.
 *⭐ 1\) Decide your hard limits \(don’t guess\)*
 
 You need these numbers before you write code:
-
 1\. *Model context size*
   ⦁ `MODEL\_CONTEXT\_TOKENS` \(e\.g\., 8k / 16k / 32k / 128k\)\.
-
 2\. *Reserve room for the model’s answer*
 You can’t use the entire context for input\. Pick:
   ⦁ `RESERVED\_OUTPUT\_TOKENS` \(e\.g\., 800–2000 depending on how long answers you want\)
-
 3\. *Reserve room for “instructions \+ scaffolding”*
 System prompt \+ policies \+ formatting:
   ⦁ `RESERVED\_OVERHEAD\_TOKENS` \(e\.g\., 300–1200\)
-
 4\. Compute your *maximum safe input budget*:
   ⦁ `MAX\_INPUT\_TOKENS \= MODEL\_CONTEXT\_TOKENS \- RESERVED\_OUTPUT\_TOKENS \- RESERVED\_OVERHEAD\_TOKENS`
 
 Example \(16k model\):
-
 ⦁ `MODEL\_CONTEXT\_TOKENS \= 16000`
 ⦁ `RESERVED\_OUTPUT\_TOKENS \= 1500`
 ⦁ `RESERVED\_OVERHEAD\_TOKENS \= 800`
 ⦁ `MAX\_INPUT\_TOKENS \= 13700`
 
 Now pick chunk sizes:
-
 ⦁ `MAX\_CHUNK\_TOKENS \= 2500–4000` \(for each summarization call\)
 ⦁ `TARGET\_CHUNK\_SUMMARY\_TOKENS \= 250–500`
 ⦁ `TARGET\_GLOBAL\_SUMMARY\_TOKENS \= 600–1200`
@@ -52,7 +46,6 @@ Store messages as:
 ```
 
 Keep stable IDs\. This lets you:
-
 ⦁ cite what chunk contains what,
 ⦁ update summaries later,
 ⦁ retrieve relevant pieces\.
@@ -64,7 +57,6 @@ Keep stable IDs\. This lets you:
 You must chunk by message boundaries, not arbitrary splits\.
 
 *✨ Chunking algorithm \(precise logic\)*
-
 ⦁ Walk messages from oldest to newest
 ⦁ Add message to current chunk until adding it would exceed `MAX\_CHUNK\_TOKENS`
 ⦁ Close the chunk, start a new one
@@ -103,7 +95,6 @@ function chunk\_messages\(messages, MAX\_CHUNK\_TOKENS\):
 *✨ Oversized single message handling \(important\)*
 
 If a single message is too large:
-
 ⦁ Run a special “summarize this one message” call
 ⦁ Replace it with its short summary for downstream chunking
 
@@ -121,10 +112,9 @@ Do *not* ask the model “summarize this” vaguely\. You want a summary that is
 >
 >You are summarizing a segment of a long user–assistant conversation\.
 >
->PURPOSE: Create a compact summary that can replace the raw messages in===>future prompts\.
+>PURPOSE: Create a compact summary that can replace the raw messages in future===>prompts\.
 >
 >MUST CAPTURE:
->
 >1\. User goals/questions asked in this segment
 >2\. Concrete facts and constraints stated \(numbers, deadlines, environment, preferences\)
 >3\. Assistant’s substantive outputs \(plans, explanations, decisions, code approaches—describe, don’t paste long code\)
@@ -132,12 +122,10 @@ Do *not* ask the model “summarize this” vaguely\. You want a summary that is
 >5\. Open issues / TODOs created or left unresolved
 >
 >MUST AVOID:
->
 >⦁ greetings, filler, repeated statements
 >⦁ non\-persistent details unless they change decisions
 >
 >OUTPUT FORMAT \(plain text, no JSON, no code fences\):
->
 >⦁ Topics:
 >⦁ User Goals:
 >⦁ Key Facts / Constraints:
@@ -169,7 +157,6 @@ This is your *first\-level summary*\.
 If you have many chunk summaries, even they might not fit\.
 
 So you compress again:
-
 1\. Group chunk summaries into “summary groups” that fit into `MAX\_CHUNK\_TOKENS`
 2\. Summarize each group into a second\-level summary
 3\. Repeat until you have 1 global summary
@@ -189,14 +176,12 @@ function group\_summaries\(chunk\_summaries, group\_size\):
 >You are compressing multiple summaries of a conversation into a higher\-level summary\.
 >
 >GOAL: Merge redundancies and preserve only durable, decision\-relevant information:
->
 >⦁ stable user preferences/constraints
 >⦁ major solutions and conclusions
 >⦁ important technical decisions/architectures
 >⦁ unresolved issues / TODOs
 >
 >OUTPUT FORMAT:
->
 >⦁ Themes:
 >⦁ Timeline \(major phases\):
 >⦁ Persistent Facts / Preferences:
@@ -222,7 +207,6 @@ Once you have a global summary \(or a small number of them\), convert it into a 
 >Convert the following conversation summary into a long\-term memory for future turns\.
 >
 >Keep only information likely to matter later:
->
 >⦁ user profile \(skill level, preferences\)
 >⦁ constraints \(tools, deadlines, environment\)
 >⦁ ongoing projects and status
@@ -230,7 +214,6 @@ Once you have a global summary \(or a small number of them\), convert it into a 
 >⦁ open questions / next steps
 >
 >Format:
->
 >⦁ User Profile:
 >⦁ Preferences:
 >⦁ Constraints:
@@ -251,7 +234,6 @@ Store this as `long\_term\_memory`\.
 *⭐ 7\) Ongoing conversation: Maintain rolling memory \(so you don’t re\-summarize everything\)*
 
 If this is a live chat system, you want:
-
 ⦁ `long\_term\_memory` \(<\= 600 tokens\)
 ⦁ `recent\_messages` \(raw, last N tokens\)
 ⦁ optionally `chunk\_summaries` for retrieval
@@ -259,15 +241,12 @@ If this is a live chat system, you want:
 *✨ Update policy \(very specific\)*
 
 Every time a new message arrives:
-
 1\. Append to `recent\_messages`
 2\. If `token\_count\(long\_term\_memory \+ recent\_messages \+ system\)` exceeds your budget:
   ⦁ select the oldest part of `recent\_messages` \(e\.g\., everything except last 6–10 turns\)
   ⦁ summarize that segment
   ⦁ merge it into `long\_term\_memory` via an “update memory” call
-  ⦁ drop===the summarized raw messages
-
-*🔸 Update\-memory prompt \(copy/paste\)*
+  ⦁ drop the summarized raw messages===*🔸 Update\-memory prompt \(copy/paste\)*
 >
 >You maintain a bounded long\-term memory of a user–assistant conversation\.
 >
@@ -278,13 +257,11 @@ Every time a new message arrives:
 ><segment summary\>
 >
 >Update the memory:
->
 >⦁ Add important persistent info
 >⦁ Update/overwrite anything that changed
 >⦁ Remove low\-value or obsolete details to stay under size limit
 >
 >Output the UPDATED MEMORY ONLY in this format:
->
 >⦁ User Profile:
 >⦁ Preferences:
 >⦁ Constraints:
@@ -301,12 +278,10 @@ This keeps you always within budget\.
 *⭐ 8\) Retrieval \(optional but highly effective\)*
 
 Instead of only having one memory blob, store:
-
 ⦁ chunk summaries \+ embeddings
 ⦁ group summaries \+ embeddings
 
 At query time:
-
 1\. Embed the user’s new question
 2\. Retrieve the top\-K relevant summaries
 3\. Put only those in the prompt \(plus long\_term\_memory \+ recent messages\)
@@ -318,7 +293,6 @@ This gives better accuracy than a single global summary, without blowing context
 *⭐ 9\) The “final prompt assembly” pattern \(what you actually send to answer\)*
 
 When responding to a new user message, build input like:
-
 1\. *System instructions*
 2\. *Long\-term memory* \(bounded\)
 3\. *Retrieved relevant summaries* \(top\-K\)
@@ -330,26 +304,21 @@ This pattern scales indefinitely because you always cap each component\.
 ————————
 
 *⭐ 10\) Common failure modes \(and how to prevent them\)*
-
-1\. *Summaries become too vague*
+1\. 
+*Summaries become too vague*
   ⦁ Fix: enforce a schema and require “Key Facts / Constraints” \+ “Decisions” \+ “TODOs”\.
-
 2\. *Important numbers/details lost*
   ⦁ Fix: explicit instruction: “preserve all numbers, commands, file paths, API names”\.
-
 3\. *Memory grows over time*
   ⦁ Fix: strict token limit \+ “drop low\-value details” requirement in update\-memory prompt\.
-
 4\. *You summarize too late and overflow*
   ⦁ Fix: start compressing at \~60–70% of budget, not at 95–100%\.
-
 5\. *Model hallucinates missing past context*
   ⦁ Fix: in system prompt say: “If not in memory/retrieved context, ask the user or request logs\.”
 
 ————————
 
 If you tell me:
-
 ⦁ which model/context size you’re using,
 ⦁ whether this is offline summarization or live chat,
 ⦁ and your language \(Python/JS\),

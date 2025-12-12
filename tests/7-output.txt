@@ -1,0 +1,382 @@
+You summarize a conversation that does *not* fit an LLM’s token budget by using a *multi‑pass, token‑bounded summarization pipeline* plus an *incremental “memory” update loop*\. In other words: you _never_ send the entire transcript\. You send controlled slices, summarize them, and keep only compact representations moving forward\.
+
+Below is a very specific, verbose, “you can implement this” guide\.
+
+————————
+
+*⭐ 1\) First, Decide Exactly What “Summarize” Means \(Output Requirements\)*
+
+If you don’t define what the summary must contain, the LLM will produce a vague narrative\. You should decide which of these you need:
+
+*✨ A\. “Continuity summary” \(best for continuing the chat\)*
+
+Must preserve:
+⦁ User goals and constraints
+⦁ Decisions already made and why
+⦁ Open questions / TODOs
+⦁ Any “user profile” preferences that affect future answers \(verbosity, tools, platform\)
+
+*✨ B\. “Audit / minutes summary” \(best for documentation\)*
+
+Must preserve:
+⦁ Timeline of major events
+⦁ Final decisions
+⦁ Action items and owners
+⦁ Key artifacts \(file names, commands, links, etc\.\)
+
+*✨ C\. “Retrieval summary” \(best for semantic search\)*
+
+Must preserve:
+⦁ Topic tags
+⦁ Important entities \(files, functions, APIs, errors\)
+⦁ Short factual statements
+⦁ Strongly structured output
+
+Most systems do *A \+ C*: a compact memory \+ searchable chunk summaries\.
+
+————————
+
+*⭐ 2\) Choose Hard Token Budgets \(No Guessing\)*
+
+You need the model’s context length:
+⦁ `MODEL\_CONTEXT\_TOKENS` \(example: 16,000\)
+
+Then choose these fixed budgets:
+
+*✨ Input/Output safety margins*
+⦁ `RESERVED\_OUTPUT\_TOKENS` \(space for the model’s answer\): 800–2,000
+⦁ `RESERVED\_OVERHEAD\_TOKENS` \(system prompt \+ tool schemas \+ wrappers\): 500–1,500
+
+Compute:
+⦁ `MAX\_INPUT\_TOKENS \= MODEL\_CONTEXT\_TOKENS \- RESERVED\_OUTPUT\_TOKENS \- RESERVED\_OVERHEAD\_TOKENS`
+
+Example:
+⦁ `MODEL\_CONTEXT\_TOKENS \= 16000`
+⦁ `RESERVED\_OUTPUT\_TOKENS \= 1500`
+⦁ `RESERVED\_OVERHEAD\_TOKENS \= 800`
+⦁ `MAX\_INPUT\_TOKENS \= 13700`
+
+*✨ Summarization chunk budgets*
+⦁ `MAX\_CHUNK\_TOKENS \= 2500–4000` \(input text per summarization call\)
+⦁ `TARGET\_CHUNK\_SUMMARY\_TOKENS \= 250–500`
+⦁ `TARGET\_GROUP\_SUMMARY\_TOKENS \= 300–600`
+⦁ `TARGET\_GLOBAL\_SUMMARY\_TOKENS \= 600–1200`
+
+*✨ Ongoing memory budgets*
+⦁ `MEMORY\_TOKEN\_LIMIT \= 400–800`
+⦁ `RECENT\_WINDOW\_TOKEN\_LIMIT \= 2000–4000`
+
+*✨ Non\-negotiable*
+
+Implement real token counting with the correct tokenizer \(e\.g\., `tiktoken` for OpenAI\)\. Do *not* estimate with characters\.
+
+You need a function like:
+⦁ `token\_count\(text\) \-\> int`
+
+————————
+
+*⭐ 3\) Represent Your Conversation Properly \(So You Can Chunk Reliably\)*
+
+Store messages as:
+```json
+\[
+  \{"id": 1, "role": "user", "content": "\.\.\.", "ts": "\.\.\."\},
+  \{"id": 2, "role": "assistant", "content": "\.\.\.", "ts": "\.\.\."\}
+\]
+```
+
+Why IDs matter:
+⦁ You can map “chunk summary \#7 covers messages 120–145”
+⦁ You can later re\-summarize only portions
+⦁ You can build retrieval indexes per chunk
+
+————————
+
+*⭐ 4\) Step 1: Chunk the Conversation \(Token\-Aware, Message\-Boundary Safe\)*
+
+*✨ Goal*
+
+Split `messages` into chunks that each fit into `MAX\_CHUNK\_TOKENS`\.
+
+*✨ Pseudocode*
+```pseudo
+function chunk\_messages\(messages, MAX\_CHUNK\_TOKENS\):
+    chunks \= \[\]
+    current \= \[\]
+    current\_tokens \= 0
+
+    for msg in messages:
+        msg\_text \= msg\.role \+ ": " \+ msg\.content
+        t \= token\_count\(msg\_text\)
+
+        if t \> MAX\_CHUNK\_TOKENS:
+            \# Oversized single message case
+            \# Strategy: summarize it alone first, then replace it\.
+            short \= summarize\_single\_message\(msg\)
+            replacement \= \{role: "assistant", content: "\(summary of oversized message\) " \+ short\}
+
+            if current not empty:
+                chunks\.append\(current\)
+                current \= \[\]
+```===```pseudo
+current\_tokens \= 0
+
+            chunks\.append\(\[replacement\]\)
+            continue
+
+        if current\_tokens \+ t \> MAX\_CHUNK\_TOKENS and current not empty:
+            chunks\.append\(current\)
+            current \= \[msg\]
+            current\_tokens \= t
+        else:
+            current\.append\(msg\)
+            current\_tokens \+\= t
+
+    if current not empty:
+        chunks\.append\(current\)
+
+    return chunks
+```
+
+*✨ Oversized\-message handling \(important\)*
+
+If a single user message is huge \(pasted logs\), you must either:
+⦁ summarize it alone, or
+⦁ split that one message into paragraphs and summarize paragraphs
+
+Otherwise chunking fails\.
+
+————————
+
+*⭐ 5\) Step 2: Summarize Each Chunk Using a Strict Schema \(First\-Level Summaries\)*
+
+Do not ask for a generic “summary\.” Demand structured fields\.
+
+*✨ Chunk summary prompt \(copy/paste\)*
+
+*System \(or leading instruction\):*
+>
+>You are summarizing a segment of a long user–assistant conversation\.
+>PURPOSE: Produce a compact, information\-dense summary that can replace the raw messages in future prompts\.
+>
+>MUST CAPTURE \(if present\):
+>⦁ User goals/questions/tasks in this segment
+>⦁ Key facts and constraints \(numbers, deadlines, environment, versions, file paths, commands\)
+>⦁ Assistant’s substantive contributions \(plans, reasoning, designs; describe code changes rather than pasting long code\)
+>⦁ Decisions/outcomes reached \(what was chosen and why\)
+>⦁ Open questions / TODOs created or remaining
+>
+>MUST MINIMIZE: greetings, filler, repetition, irrelevant details\.
+>
+>OUTPUT FORMAT \(plain text, no JSON\):
+>⦁ Topics:
+>⦁ User Goals:
+>⦁ Key Facts / Constraints:
+>⦁ Assistant Actions / Suggestions:
+>⦁ Decisions / Outcomes:
+>⦁ Open Questions / TODOs:
+>
+>HARD LENGTH LIMIT: ≤ 350 tokens\.
+
+Then paste the chunk as:
+```
+\[BEGIN SEGMENT\]
+user: \.\.\.
+assistant: \.\.\.
+\.\.\.
+\[END SEGMENT\]
+```
+
+*✨ Store chunk summaries with metadata*
+
+Store:
+```json
+\{
+  "chunk\_id": 7,
+  "message\_ids": \[120, 121, 122, \.\.\.\],
+  "summary": "Topics: \.\.\.\\nUser Goals: \.\.\.\\n\.\.\."
+\}
+```
+
+These are “first\-level summaries\.”
+
+————————
+
+*⭐ 6\) Step 3: Summarize the Summaries \(Hierarchical Compression\)*
+
+If you have many chunk summaries and they still don’t fit, compress again\.
+
+*✨ 6\.1 Group chunk summaries into batches that fit*
+
+If each chunk summary is \~350 tokens and your `MAX\_CHUNK\_TOKENS` is \~3000, choose:
+⦁ `group\_size \= 8` \(8 × 350 \= 2800 tokens input, leaving room for instructions\)
+
+Pseudocode:
+```pseudo
+function group\(items, group\_size\):
+    groups \= \[\]
+    for i in range\(0, len\(items\), group\_size\):
+        groups\.append\(items\[i : i \+ group\_size\]\)
+    return groups
+```
+
+*✨ 6\.2 Prompt: summarize multiple summaries*
+
+Copy/paste prompt:
+>
+>You are compressing multiple chunk summaries into a higher\-level summary\.
+>
+>GOAL: Merge redundancy while preserving durable information:
+>⦁ Stable user profile/preferences/constraints
+>⦁ Major solution approaches and why they were chosen
+>⦁ Key decisions/outcomes
+>⦁ Long\-running threads and status
+>⦁ Open questions/TODOs
+>
+>OUTPUT FORMAT:
+>⦁ Themes:
+>⦁ Timeline / Phases:
+>⦁ Persistent Facts / Preferences:
+>⦁ Key Decisions / Outcomes:
+>⦁ Open Questions / TODOs:
+>
+>HARD LENGTH LIMIT: ≤ 450 tokens\.
+
+Run this per group → you get “second\-level summaries\.”
+
+*✨ 6\.3 Repeat until you have a global summary*
+
+If second\-level is still too big:
+⦁ group the second\-level summaries
+⦁ summarize again
+
+This forms a summary tree:
+
+`raw messages → chunk summaries → group summaries → global summary`
+
+————————
+
+*⭐ 7\) Step 4: Convert Global Summary into “Long\-Term Memory” \(Bounded, Reusable\)*
+
+This is the object you’ll inject into future prompts instead of old raw messages\.
+
+*✨ Memory creation prompt \(copy/paste\)*
+>
+>Convert the following conversation summary into long\-term memory for future turns\.
+>Keep only information===>likely to matter later\.
+>
+>Include:
+>⦁ User Profile \(skills, preferences, communication style\)
+>⦁ Constraints / Environment \(OS, tools, versions, repo structure\)
+>⦁ Projects / Status \(what’s being built, current progress\)
+>⦁ Key Decisions \+ short rationale
+>⦁ Open Questions / TODOs
+>
+>Output format \(plain text\):
+>⦁ User Profile:
+>⦁ Preferences:
+>⦁ Constraints / Environment:
+>⦁ Projects / Status:
+>⦁ Key Decisions / Rationale:
+>⦁ Open Questions / TODOs:
+>
+>HARD LIMIT: ≤ 600 tokens\.
+
+Store as `long\_term\_memory`\.
+
+————————
+
+*⭐ 8\) Ongoing Chat: Incremental Summarization \(“Rolling Memory”\)*
+
+If you’re continuing to chat, don’t reprocess everything\. Maintain:
+⦁ `long\_term\_memory` \(bounded, e\.g\. ≤ 600 tokens\)
+⦁ `recent\_messages` \(raw, small window\)
+⦁ optional: chunk summaries indexed for retrieval
+
+*✨ 8\.1 Trigger condition*
+
+Whenever the prompt would exceed your safe input budget:
+
+`token\_count\(system \+ long\_term\_memory \+ recent\_messages \+ new\_user\_msg\) \> MAX\_INPUT\_TOKENS \* 0\.9`
+
+you compress\.
+
+*✨ 8\.2 What to compress*
+
+Keep last K turns raw \(e\.g\., 8\), summarize older ones:
+```pseudo
+function select\_old\_segment\(recent\_messages, keep\_last\=8, max\_tokens\=2000\):
+    if len\(recent\_messages\) <\= keep\_last:
+        return \[\]
+    candidates \= recent\_messages\[0 : \-keep\_last\]
+    return trim\_to\_token\_limit\(candidates, max\_tokens\)
+```
+
+*✨ 8\.3 Summarize that old segment*
+
+Use the same chunk summary prompt\.
+
+*✨ 8\.4 Merge into memory \(update\-memory prompt\)*
+
+Copy/paste:
+>
+>You maintain a bounded long\-term memory of a conversation\.
+>
+>CURRENT MEMORY:
+><existing memory\>
+>
+>NEW INFORMATION \(summary of older recent turns\):
+><segment summary\>
+>
+>Update memory by:
+>⦁ adding important persistent info
+>⦁ correcting anything that changed
+>⦁ removing low\-value/obsolete details to stay under size limit
+>
+>OUTPUT the UPDATED MEMORY ONLY in this format:
+>⦁ User Profile:
+>⦁ Preferences:
+>⦁ Constraints / Environment:
+>⦁ Projects / Status:
+>⦁ Key Decisions / Rationale:
+>⦁ Open Questions / TODOs:
+>
+>HARD LIMIT: ≤ 600 tokens\.
+
+Then delete the raw old messages you summarized\.
+
+————————
+
+*⭐ 9\) Best\-Practice: Add Retrieval \(Optional but Strongly Recommended\)*
+
+A single memory blob can lose details\. To get better recall without expanding context:
+1\. Store chunk summaries separately
+2\. Compute embeddings for them
+3\. On each new user query:
+  ⦁ embed the query
+  ⦁ retrieve top\-K relevant chunk summaries
+4\. Build prompt from:
+  ⦁ system
+  ⦁ long\_term\_memory
+  ⦁ retrieved relevant chunk summaries \(top 3–10\)
+  ⦁ recent raw messages
+
+This lets you pull in the right old details on demand\.
+
+————————
+
+*⭐ 10\) Common Failure Modes and How to Prevent Them*
+1\. *Summaries become vague*
+  ⦁ Fix: require sections like “Key Facts/Constraints” and “Decisions/Outcomes” and “TODOs”
+2\. *You lose numbers / commands / file paths*
+  ⦁ Fix: explicitly instruct “preserve all numbers, commands, file paths, versions”
+3\. *Memory grows unbounded*
+  ⦁ Fix: strict token limit \+ instruction to drop low\-value details
+4\. *You overflow context anyway*
+  ⦁ Fix: summarize earlier \(at 60–70% usage\), not at 95%
+5\. *Model hallucinates past details*
+  ⦁ Fix: system instruction: “If not present in memory/retrieved summaries, ask the user\.”
+
+————————
+
+If you tell me \(1\) which model/context size you’re using and \(2\) whether this is offline summarization or live chat memory, I can propose exact default budget numbers and a “drop\-in” algorithm tuned to that setup\.
