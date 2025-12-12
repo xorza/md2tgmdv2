@@ -162,11 +162,20 @@ impl Converter {
     }
 
     fn new_line(&mut self) {
-        let last = self.result.last_mut().unwrap();
-
-        if !last.is_empty() {
-            last.push_str("\n");
+        let last_len = self.result.last().map(|s| s.len()).unwrap_or(0);
+        if last_len == 0 {
+            return;
         }
+
+        let needed = 1 + self.quote_level as usize;
+        if last_len + needed > self.max_len {
+            // Start a fresh chunk instead of emitting an empty newline-only tail.
+            self.split_chunk();
+            return;
+        }
+
+        let last = self.result.last_mut().unwrap();
+        last.push('\n');
         if self.quote_level > 0 {
             last.push_str(&">".repeat(self.quote_level as usize));
         }

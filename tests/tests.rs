@@ -278,10 +278,10 @@ fn splits_mixed_text_and_code_block() {
     );
 }
 
-// #[test]
-// fn removes_empty_lines_on_split_3() {
-//     transform_expect_n("1234567890\n\n1234567890", "1234567890===1234567890", 10);
-// }
+#[test]
+fn removes_empty_lines_on_split_3() {
+    transform_expect_n("1234567890\n\n1234567890", "1234567890===1234567890", 10);
+}
 //
 // #[test]
 // fn url_not_split_across_chunks() {
