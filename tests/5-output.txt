@@ -103,7 +103,7 @@ Do *not* ask the model “summarize this” vaguely\. You want a summary that is
 
 *✨ Use a structured template \(recommended\)*
 *Chunk summary prompt \(copy/paste\)*
->
+
 >You are summarizing a segment of a long user–assistant conversation\.
 >
 >PURPOSE: Create a compact summary that can replace the raw messages in future prompts\.

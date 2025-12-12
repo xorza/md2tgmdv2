@@ -539,6 +539,11 @@ impl Converter {
                 debug_log!("Heading");
             }
             Tag::BlockQuote(_) => {
+                // If a blank line was pending, flush it before entering the blockquote
+                // so the empty line stays outside the quoted area.
+                if self.add_new_line {
+                    self.flush_pending_prefix();
+                }
                 self.quote_level += 1;
 
                 debug_log!("BlockQuote");

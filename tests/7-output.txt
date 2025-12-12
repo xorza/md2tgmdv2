@@ -120,7 +120,7 @@ The quality of your whole pipeline depends on the _schema_\. Without it, you’l
 
 *✨ 4\.1 Chunk summarization prompt \(copy‑paste\)*
 Use this for every chunk:
->
+
 >You are summarizing a segment of a long user–assistant conversation\.
 >PURPOSE: Produce a compact, information\-dense summary that can replace the raw messages in future prompts\.
 >

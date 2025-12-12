@@ -110,7 +110,7 @@ In your tool schema \(pseudo‑JSON\):
 3\. *Tell the model it’s allowed to call it*
 
 System prompt:
->
+
 >You are an assistant working on a Rust codebase\. Whenever you need to validate the code or check if tests are passing, call the `run\_cargo\_test` tool instead of guessing\. Use the tool _often_ after making nontrivial changes\.
 4\. *Execution loop*
 

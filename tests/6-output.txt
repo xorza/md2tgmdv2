@@ -116,7 +116,7 @@ You want a summary that can actually substitute for raw text later\.
 
 *✨ Chunk summarization prompt \(copy\-paste\)*
 Use this _for every chunk_:
->
+
 >You are summarizing a segment of a long user–assistant conversation\.
 >
 >PURPOSE: Create a compact, information\-dense summary that can replace the raw messages in future prompts\.
@@ -274,7 +274,7 @@ Use the same chunk summarization prompt to create a `segment\_summary`\.
 
 *✨ 7\.4 Merge into memory \(update\-memory prompt\)*
 Use a dedicated prompt to merge and also keep memory small:
->
+
 >You maintain a bounded long\-term memory of a conversation\.
 >
 >CURRENT MEMORY:

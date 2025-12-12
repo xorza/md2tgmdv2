@@ -1,7 +1,7 @@
 To summarize a conversation with an LLM when the full transcript does *not* fit your token budget, you need a *controlled, multi\-pass summarization pipeline* plus \(if the conversation continues\) a *rolling memory* strategy\.
 
 The key principle is:
->
+
 >*Never try to send the whole conversation\.*
 >Instead, send *bounded chunks*, summarize them, and keep only compact artifacts that can be reused\.
 
