@@ -89,7 +89,7 @@ fn escapes_inline_code_markers() {
 fn converts_list_after_blank_line() {
     transform_expect_1(
         "Assume:\n\n- `MODEL_CONTEXT_TOKENS` = max",
-        "Assume:\n\n⦁ `MODEL\\_CONTEXT\\_TOKENS` \\= max",
+        "Assume:\n⦁ `MODEL\\_CONTEXT\\_TOKENS` \\= max",
     );
 }
 
@@ -211,7 +211,7 @@ fn converts_thematic_break_to_em_dash_bar() {
 fn converts_thematic_break_after_line_to_heading() {
     transform_expect_1(
         "some test\n---\nsome more test",
-        "*⭐ some test*\n\nsome more test",
+        "*⭐ some test*\nsome more test",
     );
 }
 

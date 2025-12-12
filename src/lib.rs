@@ -26,7 +26,6 @@ pub struct Converter {
     add_new_line: bool,
     after_heading: bool,
     quote_level: u8,
-    list: bool, // Deprecated; kept for backward compatibility, not used.
     list_stack: Vec<ListState>,
     carry_list_indent_levels: usize,
     after_list_prefix: bool,
@@ -55,7 +54,6 @@ impl Default for Converter {
             add_new_line: false,
             after_heading: false,
             quote_level: 0,
-            list: false,
             list_stack: Vec::new(),
             carry_list_indent_levels: 0,
             after_list_prefix: false,
@@ -494,14 +492,7 @@ impl Converter {
             }
             Tag::Heading { level, .. } => {
                 self.new_line();
-                match level {
-                    HeadingLevel::H1 => self.output("*🌟 ", false),
-                    HeadingLevel::H2 => self.output("*⭐ ", false),
-                    HeadingLevel::H3 => self.output("*✨ ", false),
-                    HeadingLevel::H4 => self.output("*🔸 ", false),
-                    HeadingLevel::H5 => self.output("_🔹 ", false),
-                    HeadingLevel::H6 => self.output("_✴️ ", false),
-                }
+                self.output(heading_prefix(level), false);
 
                 debug_log!("Heading");
             }
@@ -543,7 +534,6 @@ impl Converter {
                 debug_log!("HtmlBlock");
             }
             Tag::List(n) => {
-                self.list = true;
                 let extra_levels = if self.list_stack.is_empty() {
                     self.carry_list_indent_levels
                 } else {
@@ -691,14 +681,7 @@ impl Converter {
                 debug_log!("EndParagraph");
             }
             TagEnd::Heading(level) => {
-                match level {
-                    HeadingLevel::H1 => self.output_closing("*", false),
-                    HeadingLevel::H2 => self.output_closing("*", false),
-                    HeadingLevel::H3 => self.output_closing("*", false),
-                    HeadingLevel::H4 => self.output_closing("*", false),
-                    HeadingLevel::H5 => self.output_closing("_", false),
-                    HeadingLevel::H6 => self.output_closing("_", false),
-                }
+                self.output_closing(heading_closer(level), false);
                 self.add_new_line = false;
                 self.after_heading = true;
 
@@ -721,7 +704,6 @@ impl Converter {
                 debug_log!("EndHtmlBlock");
             }
             TagEnd::List(_) => {
-                self.list = false;
                 if let Some(state) = self.list_stack.pop() {
                     // If we just closed a single-item ordered list, consider the next
                     // top-level list as nested one level deeper (common in docs).
@@ -832,6 +814,24 @@ fn descriptor_closer(desc: &Descriptor) -> &'static str {
         Descriptor::Strikethrough => "~~",
         Descriptor::Code => "`",
         Descriptor::CodeBlock(_) => "```",
+    }
+}
+
+fn heading_prefix(level: HeadingLevel) -> &'static str {
+    match level {
+        HeadingLevel::H1 => "*🌟 ",
+        HeadingLevel::H2 => "*⭐ ",
+        HeadingLevel::H3 => "*✨ ",
+        HeadingLevel::H4 => "*🔸 ",
+        HeadingLevel::H5 => "_🔹 ",
+        HeadingLevel::H6 => "_✴️ ",
+    }
+}
+
+fn heading_closer(level: HeadingLevel) -> &'static str {
+    match level {
+        HeadingLevel::H1 | HeadingLevel::H2 | HeadingLevel::H3 | HeadingLevel::H4 => "*",
+        HeadingLevel::H5 | HeadingLevel::H6 => "_",
     }
 }
 
