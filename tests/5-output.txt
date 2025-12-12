@@ -5,7 +5,6 @@ Below is a very specific, verbose, implementable approach\.
 ————————
 
 *⭐ 1\) Decide your hard limits \(don’t guess\)*
-
 You need these numbers before you write code:
 1\. *Model context size*
   ⦁ `MODEL\_CONTEXT\_TOKENS` \(e\.g\., 8k / 16k / 32k / 128k\)\.
@@ -35,7 +34,6 @@ Now pick chunk sizes:
 ————————
 
 *⭐ 2\) Represent the conversation in a machine\-friendly form*
-
 Store messages as:
 ```json
 \[
@@ -53,7 +51,6 @@ Keep stable IDs\. This lets you:
 ————————
 
 *⭐ 3\) Step 1: Chunk the conversation \(token\-aware, message boundary safe\)*
-
 You must chunk by message boundaries, not arbitrary splits\.
 
 *✨ Chunking algorithm \(precise logic\)*
@@ -93,7 +90,6 @@ function chunk\_messages\(messages, MAX\_CHUNK\_TOKENS\):
 ```
 
 *✨ Oversized single message handling \(important\)*
-
 If a single message is too large:
 ⦁ Run a special “summarize this one message” call
 ⦁ Replace it with its short summary for downstream chunking
@@ -103,18 +99,15 @@ This prevents pipeline failure on huge pasted logs\.
 ————————
 
 *⭐ 4\) Step 2: Summarize each chunk with a strict schema*
-
 Do *not* ask the model “summarize this” vaguely\. You want a summary that is useful later, not a nice narrative\.
 
 *✨ Use a structured template \(recommended\)*
-
 *Chunk summary prompt \(copy/paste\)*
 >
 >You are summarizing a segment of a long user–assistant conversation\.
 >
->PURPOSE: Create a compact summary that can replace the raw messages in future===>prompts\.
->
->MUST CAPTURE:
+>PURPOSE: Create a compact summary that can replace the raw messages in future prompts\.
+>===>MUST CAPTURE:
 >1\. User goals/questions asked in this segment
 >2\. Concrete facts and constraints stated \(numbers, deadlines, environment, preferences\)
 >3\. Assistant’s substantive outputs \(plans, explanations, decisions, code approaches—describe, don’t paste long code\)
@@ -153,7 +146,6 @@ This is your *first\-level summary*\.
 ————————
 
 *⭐ 5\) Step 3: Summarize the summaries \(hierarchical compression\)*
-
 If you have many chunk summaries, even they might not fit\.
 
 So you compress again:
@@ -162,7 +154,6 @@ So you compress again:
 3\. Repeat until you have 1 global summary
 
 *✨ Grouping logic*
-
 If each chunk summary is \~350 tokens, then a group size of \~8–10 often fits \(plus prompt overhead\)\.
 
 Pseudocode:
@@ -172,7 +163,6 @@ function group\_summaries\(chunk\_summaries, group\_size\):
 ```
 
 *✨ “Summaries of summaries” prompt*
->
 >You are compressing multiple summaries of a conversation into a higher\-level summary\.
 >
 >GOAL: Merge redundancies and preserve only durable, decision\-relevant information:
@@ -199,11 +189,9 @@ Repeat until total is within your global target size\.
 ————————
 
 *⭐ 6\) Step 4: Create a “Long\-Term Memory” object \(bounded, reusable\)*
-
 Once you have a global summary \(or a small number of them\), convert it into a compact memory you can inject into future prompts\.
 
 *✨ Memory\-building prompt*
->
 >Convert the following conversation summary into a long\-term memory for future turns\.
 >
 >Keep only information likely to matter later:
@@ -232,22 +220,21 @@ Store this as `long\_term\_memory`\.
 ————————
 
 *⭐ 7\) Ongoing conversation: Maintain rolling memory \(so you don’t re\-summarize everything\)*
-
 If this is a live chat system, you want:
 ⦁ `long\_term\_memory` \(<\= 600 tokens\)
 ⦁ `recent\_messages` \(raw, last N tokens\)
 ⦁ optionally `chunk\_summaries` for retrieval
 
 *✨ Update policy \(very specific\)*
-
 Every time a new message arrives:
 1\. Append to `recent\_messages`
 2\. If `token\_count\(long\_term\_memory \+ recent\_messages \+ system\)` exceeds your budget:
   ⦁ select the oldest part of `recent\_messages` \(e\.g\., everything except last 6–10 turns\)
   ⦁ summarize that segment
   ⦁ merge it into `long\_term\_memory` via an “update memory” call
-  ⦁ drop the summarized raw messages===*🔸 Update\-memory prompt \(copy/paste\)*
->
+  ⦁ drop the summarized raw messages
+
+*🔸 Update\-memory=== prompt \(copy/paste\)*
 >You maintain a bounded long\-term memory of a user–assistant conversation\.
 >
 >CURRENT MEMORY:
@@ -276,7 +263,6 @@ This keeps you always within budget\.
 ————————
 
 *⭐ 8\) Retrieval \(optional but highly effective\)*
-
 Instead of only having one memory blob, store:
 ⦁ chunk summaries \+ embeddings
 ⦁ group summaries \+ embeddings
@@ -291,7 +277,6 @@ This gives better accuracy than a single global summary, without blowing context
 ————————
 
 *⭐ 9\) The “final prompt assembly” pattern \(what you actually send to answer\)*
-
 When responding to a new user message, build input like:
 1\. *System instructions*
 2\. *Long\-term memory* \(bounded\)

@@ -699,7 +699,7 @@ impl Converter {
                     HeadingLevel::H5 => self.output_closing("_", false),
                     HeadingLevel::H6 => self.output_closing("_", false),
                 }
-                self.add_new_line = true;
+                self.add_new_line = false;
                 self.after_heading = true;
 
                 debug_log!("EndHeading");

@@ -5,7 +5,6 @@ Below is a concrete recipe, written so you can implement it\.
 ————————
 
 *⭐ 1\. What You’re Trying To Achieve*
-
 Given:
 ⦁ A long conversation: a list like
 `messages \= \[\{role: "user"\|"assistant", content: string\}, …\]`
@@ -24,7 +23,6 @@ You cannot just send the whole conversation; instead you:
 ————————
 
 *⭐ 2\. Set Explicit Token Budgets*
-
 You must pick explicit numbers, not guess\.
 
 Assume:
@@ -56,9 +54,7 @@ Everything else will rely on this\.
 ————————
 
 *⭐ 3\. Offline: Summarize an Existing Long Conversation*
-
 *✨ 3\.1\. Step 1 – Chunk the Conversation*
-
 Input:
 ```text
 messages \= \[
@@ -111,17 +107,15 @@ Notes:
 ————————
 
 *✨ 3\.2\. Step 2 – Summarize Each Chunk with the LLM*
-
 For each chunk, call the LLM with a strict summarization prompt\.
 
 *🔸 Prompt template \(per chunk, copy‑paste\):*
->
 >You are summarizing a segment of a long conversation between a user and an assistant\.
 >
 >Your goal is to produce a short but highly informative summary that can replace the raw messages in future prompts\.
 >
->*INCLUDE \(only if present and*===>*important\):*
->⦁ Main user questions, tasks, and goals in this segment
+>*INCLUDE \(only if present and important\):*
+>===>⦁ Main user questions, tasks, and goals in this segment
 >⦁ Important facts, constraints, and preferences the user states \(deadlines, environment, skill level, likes/dislikes, etc\.\)
 >⦁ Key explanations, designs, solution ideas, and reasoning from the assistant \(described concisely in words; avoid large code blocks\)
 >⦁ Any decisions made, final answers given, or conclusions reached
@@ -167,11 +161,9 @@ Now the entire long conversation is represented by, say, 50–200 chunk summarie
 ————————
 
 *✨ 3\.3\. Step 3 – Summarize the Summaries \(Hierarchy\)*
-
 If all `chunk\_summaries` together are still too big for your use case, compress them again\.
 
 *🔸 3\.3\.1\. Group summaries*
-
 Choose `group\_size` so that `group\_size \* TARGET\_CHUNK\_SUMMARY\_TOKENS` fits comfortably under `MAX\_CHUNK\_TOKENS`\.
 
 Example: if chunk summaries ≈300 tokens, `group\_size \= 10` ⇒ \~3000 tokens of input\.
@@ -185,7 +177,6 @@ for i in range\(0, len\(chunk\_summaries\), group\_size\):
 Each `group` will be converted into a higher‑level summary\.
 
 *🔸 3\.3\.2\. Prompt to compress a group of summaries:*
->
 >You are compressing multiple conversation summaries into a more compact higher‑level summary\.
 >
 >*INPUT:*
@@ -214,8 +205,8 @@ Each `group` will be converted into a higher‑level summary\.
 >
 >Now compress the following summaries into one higher‑level summary:
 >
->\[BEGIN===>SUMMARIES\]
-><insert the chunk summaries here, separated and in order\>
+>\[BEGIN SUMMARIES\]
+><insert===>the chunk summaries here, separated and in order\>
 >\[END SUMMARIES\]
 
 Pseudocode:
@@ -236,11 +227,9 @@ If the list `group\_summaries` is still too long in total:
 ————————
 
 *✨ 3\.4\. Step 4 – Convert Global Summary into a Reusable “Memory”*
-
 Now you have a global textual summary\. Turn it into a small, structured memory object\.
 
 *🔸 Prompt: global summary → long‑term memory*
->
 >You are constructing a compact long‑term memory from a global summary of a user–assistant conversation\.
 >
 >*INPUT:*
@@ -278,14 +267,12 @@ The model’s output is your `long\_term\_memory` string: a compressed represent
 ————————
 
 *⭐ 4\. Online: Keep Summarizing As You Chat*
-
 When conversation keeps growing, you need a *rolling* solution:
 ⦁ Maintain:
   ⦁ a small `long\_term\_memory` \(bounded text\), and
   ⦁ a list of `recent\_messages` \(raw most recent turns\)\.
 
-*✨ 4\.1\. State*
-```pseudo
+*✨ 4\.1\. State*```pseudo
 state \= \{
     "long\_term\_memory": "",  \# string, ≤ MEMORY\_TOKEN\_LIMIT
     "recent\_messages": \[\]    \# list of \{role, content\}
@@ -293,7 +280,6 @@ state \= \{
 ```
 
 *✨ 4\.2\. On Every New User Message*
-
 Algorithm:
 ```pseudo
 function handle\_user\_message\(user\_text\):
@@ -320,8 +306,8 @@ function handle\_user\_message\(user\_text\):
                 new\_summary \= segment\_summary
             \)
 
-    \# 4\. Build final prompt using```===```pseudo
-updated memory \+ remaining recent messages
+    \# 4\. Build final prompt using updated memory \+ remaining```===```pseudo
+recent messages
     prompt \= build\_answer\_prompt\(
         long\_term\_memory \= state\.long\_term\_memory,
         recent\_messages \= state\.recent\_messages
@@ -337,7 +323,6 @@ updated memory \+ remaining recent messages
 ```
 
 *✨ 4\.3\. Selecting Which Old Messages to Summarize*
-
 Simple policy:
 ⦁ Always keep the last `K` messages raw,
 ⦁ Summarize everything older, up to a token limit\.
@@ -361,11 +346,9 @@ function select\_old\_segment\(recent\_messages\):
 ————————
 
 *✨ 4\.4\. Updating Memory Using the LLM*
-
 You merge `segment\_summary` into existing `long\_term\_memory` with another LLM call\.
 
 *🔸 Prompt: update memory*
->
 >You maintain a long‑term memory for a user–assistant conversation\.
 >
 >CURRENT\_MEMORY:
@@ -414,7 +397,6 @@ This keeps `long\_term\_memory`:
 ————————
 
 *✨ 4\.5\. Building the Actual Prompt for Answers*
-
 To let the LLM answer the user using compressed history:
 ```pseudo
 function build\_answer\_prompt\(long\_term\_memory, recent\_messages\):
@@ -443,8 +425,8 @@ Always send:
   ⦁ A compressed long‑term memory,
   ⦁ A recent window of raw messages\.
 2\. *Use the LLM in several passes:*
-  ⦁ Chunk‑level===summarization,
-  ⦁ Hierarchical compression \(if needed\),
+  ⦁ Chunk‑level summarization,
+  ⦁ Hierarchical===compression \(if needed\),
   ⦁ Memory creation,
   ⦁ Memory updates\.
 3\. *Prompts must be explicit and structured\.*

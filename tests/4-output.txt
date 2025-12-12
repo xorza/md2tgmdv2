@@ -1,5 +1,4 @@
 *🔸 Prompt template \(per chunk, copy‑paste\):*
->
 >You are summarizing a segment of a long conversation between a user and an assistant\.
 >
 >Your goal is to produce a short but highly informative summary that can replace the raw messages in future prompts\.

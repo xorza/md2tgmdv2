@@ -9,7 +9,6 @@ Below are detailed setups for the main scenarios\.
 ————————
 
 *⭐ 1\. Preconditions: Make `cargo test` always runnable*
-
 Regardless of tooling:
 1\. *Rust and Cargo installed*
   ⦁ Install via `rustup`\.
@@ -32,7 +31,6 @@ Once this is true, the only remaining step is wiring the _LLM interface_ to be a
 ————————
 
 *⭐ 2\. In VS Code \(GitHub Copilot / Code LLM\)*
-
 If your “Codex” use case is basically: “I’m in VS Code and I want tests easily runnable with LLM assistance\.”
 
 You can’t make Copilot itself execute commands, but you can make it trivial to do from the editor:
@@ -72,7 +70,6 @@ You’re still the one pressing the key, but functionally it’s “always ready
 ————————
 
 *⭐ 3\. Via the OpenAI API \(tool / function calling approach\)*
-
 If you’re building your own app around an OpenAI code model and want the model to *actually run* `cargo test`:
 1\. *Define a tool / function that runs tests*
 
@@ -129,8 +126,7 @@ From the model’s perspective, it “can always run `cargo test`” by calling 
 ————————
 
 *⭐ 4\. In a dev container / Codespaces / CI pipeline*
-
-If your environment is ephemeral===\(Codespaces, dev containers, remote runner\):
+If your environment is ephemeral \(Codespaces,===dev containers, remote runner\):
 1\. *Ensure Cargo is preinstalled in the image*
   ⦁ Dockerfile \(simplified\):```dockerfile
 FROM rust:latest
@@ -170,7 +166,6 @@ Now your CI always runs `cargo test`, and you can let the model know “CI runs 
 ————————
 
 *⭐ 5\. Practical “always ready” setup in a local workflow*
-
 If your goal is “I’m using an LLM to write Rust, and I want running tests to be frictionless every time it suggests it,” here’s a concrete workflow:
 1\. *Project root & tools*
   ⦁ Open terminal in project root \(where `Cargo\.toml` is\)\.
@@ -203,7 +198,6 @@ This gives you a low‑friction “human‑in‑the‑loop tool call\.”
 ————————
 
 *⭐ 7\. Minimal answer in one sentence*
-
 To “always allow Codex to run `cargo test`,” you must \(a\) ensure Rust and Cargo are installed and you’re in the project root, and \(b\) either expose `cargo test` as a tool/function the model can call from your app, or keep a terminal in the project root and agree that whenever the model asks, you manually run `cargo test` and feed it the results\.
 
 If you tell me whether you’re using:
