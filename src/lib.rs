@@ -94,7 +94,7 @@ impl Converter {
                     self.stack.push(Descriptor::Code);
                     self.output("`", false);
                     self.output(&txt, true);
-                    self.output("`", false);
+                    self.output_closing("`", false);
                     self.close_descriptor(Descriptor::Code)?;
 
                     println!("Code");
@@ -172,6 +172,17 @@ impl Converter {
         }
     }
     fn output(&mut self, txt: &str, escape: bool) {
+        self.output_with_skip(txt, escape, false);
+    }
+
+    /// Write a closing marker for the currently open top descriptor.
+    /// This skips reserving space for that descriptor's own closer,
+    /// so we don't over-reserve and force an unnecessary split.
+    fn output_closing(&mut self, txt: &str, escape: bool) {
+        self.output_with_skip(txt, escape, true);
+    }
+
+    fn output_with_skip(&mut self, txt: &str, escape: bool, skip_top: bool) {
         let owned = if escape {
             escape_text(txt)
         } else {
@@ -183,7 +194,7 @@ impl Converter {
             // Reserve room for pending prefix and required closers so we never
             // overflow the chunk once we have to emit closing markers.
             let pending_prefix = self.pending_prefix_len();
-            let closers_len = self.closers_len();
+            let closers_len = self.closers_len(skip_top);
             let current_len = self.result.last().map(|s| s.len()).unwrap_or(0);
 
             if current_len + pending_prefix + closers_len >= self.max_len {
@@ -281,8 +292,12 @@ impl Converter {
         }
     }
 
-    fn closers_len(&self) -> usize {
-        self.stack.iter().map(descriptor_closer).map(str::len).sum()
+    fn closers_len(&self, skip_top: bool) -> usize {
+        let mut iter = self.stack.iter().rev();
+        if skip_top {
+            iter.next();
+        }
+        iter.map(descriptor_closer).map(str::len).sum()
     }
 
     fn start_tag(&mut self, tag: Tag) -> anyhow::Result<()> {
@@ -411,12 +426,12 @@ impl Converter {
             }
             TagEnd::Heading(level) => {
                 match level {
-                    HeadingLevel::H1 => self.output("**", false),
-                    HeadingLevel::H2 => self.output("**", false),
-                    HeadingLevel::H3 => self.output("**", false),
-                    HeadingLevel::H4 => self.output("**", false),
-                    HeadingLevel::H5 => self.output("_", false),
-                    HeadingLevel::H6 => self.output("_", false),
+                    HeadingLevel::H1 => self.output_closing("**", false),
+                    HeadingLevel::H2 => self.output_closing("**", false),
+                    HeadingLevel::H3 => self.output_closing("**", false),
+                    HeadingLevel::H4 => self.output_closing("**", false),
+                    HeadingLevel::H5 => self.output_closing("_", false),
+                    HeadingLevel::H6 => self.output_closing("_", false),
                 }
                 self.add_new_line = true;
 
@@ -429,7 +444,7 @@ impl Converter {
                 println!("EndBlockQuote");
             }
             TagEnd::CodeBlock => {
-                self.output("```", false);
+                self.output_closing("```", false);
                 self.add_new_line = true;
                 self.close_descriptor(Descriptor::CodeBlock(String::new()))?;
 
@@ -469,19 +484,19 @@ impl Converter {
                 println!("EndSuperscript");
             }
             TagEnd::Emphasis => {
-                self.output("_", false);
+                self.output_closing("_", false);
                 self.close_descriptor(Descriptor::Emphasis)?;
 
                 println!("EndEmphasis");
             }
             TagEnd::Strong => {
-                self.output("**", false);
+                self.output_closing("**", false);
                 self.close_descriptor(Descriptor::Strong)?;
 
                 println!("EndStrong");
             }
             TagEnd::Strikethrough => {
-                self.output("~~", false);
+                self.output_closing("~~", false);
                 self.close_descriptor(Descriptor::Strikethrough)?;
             }
             TagEnd::Link => {

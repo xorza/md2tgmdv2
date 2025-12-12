@@ -13,7 +13,7 @@ fn transform_expect_1(input: &str, expected: &str) {
 
 #[allow(dead_code)]
 fn transform_expect_n(input: &str, expected: &str, max_chunk_length: usize) {
-    let chunks = Converter::default().go(input).unwrap();
+    let chunks = Converter::new(max_chunk_length).go(input).unwrap();
     let actual = chunks.join("===");
 
     assert_eq!(actual, expected);
