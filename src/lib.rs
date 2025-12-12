@@ -447,7 +447,7 @@ impl PartialEq for Descriptor {
             (Descriptor::CodeBlock(_), Descriptor::CodeBlock(_)) => true,
             (Descriptor::Code, Descriptor::Code) => true,
             (Descriptor::Strikethrough, Descriptor::Strikethrough) => true,
-            _ => false,
+            _ => unimplemented!(),
         }
     }
 }
