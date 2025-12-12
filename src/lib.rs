@@ -11,6 +11,15 @@ use std::ops::Range;
 
 /// Telegram MarkdownV2 message hard limit.
 pub const TELEGRAM_BOT_MAX_MESSAGE_LENGTH: usize = 4096;
+const DEBUG_LOG: bool = false;
+
+macro_rules! debug_log {
+    ($($arg:tt)*) => {
+        if DEBUG_LOG {
+            println!($($arg)*);
+        }
+    };
+}
 
 #[derive(Debug)]
 pub struct Converter {
@@ -88,7 +97,7 @@ impl Converter {
                         self.link_dest_url.clear();
                     }
 
-                    println!("Text {}", txt);
+                    debug_log!("Text {}", txt);
                 }
                 Event::Code(txt) => {
                     self.stack.push(Descriptor::Code);
@@ -97,49 +106,49 @@ impl Converter {
                     self.output_closing("`", false);
                     self.close_descriptor(Descriptor::Code)?;
 
-                    println!("Code");
+                    debug_log!("Code");
                 }
                 Event::InlineMath(txt) => {
                     self.output(&txt, true);
 
-                    println!("InlineMath");
+                    debug_log!("InlineMath");
                 }
                 Event::DisplayMath(txt) => {
                     self.output(&txt, true);
 
-                    println!("DisplayMath");
+                    debug_log!("DisplayMath");
                 }
                 Event::Html(txt) => {
                     self.output(&txt, true);
 
-                    println!("Html");
+                    debug_log!("Html");
                 }
                 Event::InlineHtml(txt) => {
                     self.output(&txt, true);
 
-                    println!("InlineHtml");
+                    debug_log!("InlineHtml");
                 }
                 Event::FootnoteReference(txt) => {
                     self.output(&txt, true);
 
-                    println!("FootnoteReference");
+                    debug_log!("FootnoteReference");
                 }
                 Event::SoftBreak => {
                     self.add_new_line = true;
 
-                    println!("SoftBreak");
+                    debug_log!("SoftBreak");
                 }
                 Event::HardBreak => {
                     self.add_new_line = true;
 
-                    println!("HardBreak");
+                    debug_log!("HardBreak");
                 }
                 Event::Rule => {
                     self.new_line();
                     self.output("————————", true);
                     self.add_new_line = true;
 
-                    println!("Rule");
+                    debug_log!("Rule");
                 }
                 Event::TaskListMarker(b) => {
                     self.new_line();
@@ -149,7 +158,7 @@ impl Converter {
                         self.output("☐", false);
                     }
 
-                    println!("TaskListMarker({})", b);
+                    debug_log!("TaskListMarker({})", b);
                 }
             }
         }
@@ -387,7 +396,7 @@ impl Converter {
             Tag::Paragraph => {
                 self.new_line();
 
-                println!("Paragraph");
+                debug_log!("Paragraph");
             }
             Tag::Heading { level, .. } => {
                 self.new_line();
@@ -400,12 +409,12 @@ impl Converter {
                     HeadingLevel::H6 => self.output("_✴️ ", false),
                 }
 
-                println!("Heading");
+                debug_log!("Heading");
             }
             Tag::BlockQuote(_) => {
                 self.quote_level += 1;
 
-                println!("BlockQuote");
+                debug_log!("BlockQuote");
             }
             Tag::CodeBlock(kind) => {
                 if let Some(last) = self.result.last() {
@@ -422,82 +431,82 @@ impl Converter {
                 self.add_new_line = true;
                 self.stack.push(Descriptor::CodeBlock(lang));
 
-                println!("CodeBlock");
+                debug_log!("CodeBlock");
             }
             Tag::HtmlBlock => {
-                println!("HtmlBlock");
+                debug_log!("HtmlBlock");
             }
             Tag::List(_) => {
                 self.list = true;
 
-                println!("List");
+                debug_log!("List");
             }
             Tag::Item => {
                 self.new_line();
                 self.output("⦁ ", false);
 
-                println!("Item");
+                debug_log!("Item");
             }
             Tag::FootnoteDefinition(_) => {
-                println!("FootnoteDefinition");
+                debug_log!("FootnoteDefinition");
             }
             Tag::Table(_) => {
-                println!("Table");
+                debug_log!("Table");
             }
             Tag::TableHead => {
-                println!("TableHead");
+                debug_log!("TableHead");
             }
             Tag::TableRow => {
-                println!("TableRow");
+                debug_log!("TableRow");
             }
             Tag::TableCell => {
-                println!("TableCell");
+                debug_log!("TableCell");
             }
             Tag::Subscript => {
-                println!("Subscript");
+                debug_log!("Subscript");
             }
             Tag::Superscript => {
-                println!("Superscript");
+                debug_log!("Superscript");
             }
             Tag::Emphasis => {
                 self.output("_", false);
                 self.stack.push(Descriptor::Emphasis);
 
-                println!("Emphasis");
+                debug_log!("Emphasis");
             }
             Tag::Strong => {
                 self.output("**", false);
                 self.stack.push(Descriptor::Strong);
 
-                println!("Strong");
+                debug_log!("Strong");
             }
             Tag::Strikethrough => {
                 self.output("~~", false);
                 self.stack.push(Descriptor::Strikethrough);
 
-                println!("Strikethrough");
+                debug_log!("Strikethrough");
             }
             Tag::Link { dest_url, .. } => {
                 assert!(self.link_dest_url.is_empty());
 
                 self.link_dest_url = dest_url.to_string();
 
-                println!("Link");
+                debug_log!("Link");
             }
             Tag::Image { .. } => {
-                println!("Image");
+                debug_log!("Image");
             }
             Tag::MetadataBlock(_) => {
-                println!("MetadataBlock");
+                debug_log!("MetadataBlock");
             }
             Tag::DefinitionList => {
-                println!("DefinitionList");
+                debug_log!("DefinitionList");
             }
             Tag::DefinitionListTitle => {
-                println!("DefinitionListTitle");
+                debug_log!("DefinitionListTitle");
             }
             Tag::DefinitionListDefinition => {
-                println!("DefinitionListDefinition");
+                debug_log!("DefinitionListDefinition");
             }
         }
 
@@ -509,7 +518,7 @@ impl Converter {
             TagEnd::Paragraph => {
                 self.add_new_line = true;
 
-                println!("EndParagraph");
+                debug_log!("EndParagraph");
             }
             TagEnd::Heading(level) => {
                 match level {
@@ -522,87 +531,87 @@ impl Converter {
                 }
                 self.add_new_line = true;
 
-                println!("EndHeading");
+                debug_log!("EndHeading");
             }
             TagEnd::BlockQuote(_) => {
                 self.add_new_line = true;
                 self.quote_level -= 1;
 
-                println!("EndBlockQuote");
+                debug_log!("EndBlockQuote");
             }
             TagEnd::CodeBlock => {
                 self.output_closing("```", false);
                 self.add_new_line = true;
                 self.close_descriptor(Descriptor::CodeBlock(String::new()))?;
 
-                println!("EndCodeBlock");
+                debug_log!("EndCodeBlock");
             }
             TagEnd::HtmlBlock => {
-                println!("EndHtmlBlock");
+                debug_log!("EndHtmlBlock");
             }
             TagEnd::List(_) => {
                 self.list = false;
                 self.add_new_line = true;
 
-                println!("EndList");
+                debug_log!("EndList");
             }
             TagEnd::Item => {
-                println!("EndItem");
+                debug_log!("EndItem");
             }
             TagEnd::FootnoteDefinition => {
-                println!("EndFootnoteDefinition");
+                debug_log!("EndFootnoteDefinition");
             }
             TagEnd::Table => {
-                println!("EndTable");
+                debug_log!("EndTable");
             }
             TagEnd::TableHead => {
-                println!("EndTableHead");
+                debug_log!("EndTableHead");
             }
             TagEnd::TableRow => {
-                println!("EndTableRow");
+                debug_log!("EndTableRow");
             }
             TagEnd::TableCell => {
-                println!("EndTableCell");
+                debug_log!("EndTableCell");
             }
             TagEnd::Subscript => {
-                println!("EndSubscript");
+                debug_log!("EndSubscript");
             }
             TagEnd::Superscript => {
-                println!("EndSuperscript");
+                debug_log!("EndSuperscript");
             }
             TagEnd::Emphasis => {
                 self.output_closing("_", false);
                 self.close_descriptor(Descriptor::Emphasis)?;
 
-                println!("EndEmphasis");
+                debug_log!("EndEmphasis");
             }
             TagEnd::Strong => {
                 self.output_closing("**", false);
                 self.close_descriptor(Descriptor::Strong)?;
 
-                println!("EndStrong");
+                debug_log!("EndStrong");
             }
             TagEnd::Strikethrough => {
                 self.output_closing("~~", false);
                 self.close_descriptor(Descriptor::Strikethrough)?;
             }
             TagEnd::Link => {
-                println!("EndLink");
+                debug_log!("EndLink");
             }
             TagEnd::Image => {
-                println!("EndImage");
+                debug_log!("EndImage");
             }
             TagEnd::MetadataBlock(_) => {
-                println!("EndMetadataBlock");
+                debug_log!("EndMetadataBlock");
             }
             TagEnd::DefinitionList => {
-                println!("EndDefinitionList");
+                debug_log!("EndDefinitionList");
             }
             TagEnd::DefinitionListTitle => {
-                println!("EndDefinitionListTitle");
+                debug_log!("EndDefinitionListTitle");
             }
             TagEnd::DefinitionListDefinition => {
-                println!("EndDefinitionListDefinition");
+                debug_log!("EndDefinitionListDefinition");
             }
         }
 
