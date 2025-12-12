@@ -457,18 +457,18 @@ impl Converter {
         iter.map(descriptor_closer).map(str::len).sum()
     }
 
-    fn list_prefix(&mut self) -> (String, usize) {
+    fn list_prefix(&mut self) -> String {
         let base_levels = self.list_stack.len().saturating_sub(1);
         let extra_levels = self.list_stack.last().map(|s| s.extra_levels).unwrap_or(0);
         let indent_len = (base_levels + extra_levels) * 2;
         let indent = " ".repeat(indent_len);
         if let Some(state) = self.list_stack.last_mut() {
             if state.ordered {
-                let number = state.start + state.items.len() as u64;
-                return (format!("{}{}\\. ", indent, number), indent_len);
+                let number = state.start + state.items as u64;
+                return format!("{}{}\\. ", indent, number);
             }
         }
-        (format!("{}⦁ ", indent), indent_len)
+        format!("{}⦁ ", indent)
     }
 
     fn start_tag(&mut self, tag: Tag) -> anyhow::Result<()> {
@@ -563,7 +563,7 @@ impl Converter {
                     self.new_line();
                     self.add_new_line = false;
                 }
-                let (prefix, indent_len) = self.list_prefix();
+                let prefix = self.list_prefix();
                 // Ensure the prefix fits; if not, split first.
                 let pending_prefix = self.pending_prefix_len();
                 let closers_len = self.closers_len(false);
@@ -573,18 +573,12 @@ impl Converter {
                 }
                 self.flush_pending_prefix();
                 let chunk_idx = self.result.len() - 1;
-                let start = self.result[chunk_idx].len();
                 self.result[chunk_idx].push_str(&prefix);
-                let end = self.result[chunk_idx].len();
 
                 if let Some(state) = self.list_stack.last_mut() {
                     if state.ordered {
-                        state.items.push(ItemMarker {
-                            chunk_idx,
-                            start,
-                            end,
-                            indent_len,
-                        });
+                        // track count to decide on follow-up indentation heuristics
+                        state.items += 1;
                     }
                 }
                 self.after_list_prefix = true;
@@ -707,7 +701,7 @@ impl Converter {
                 if let Some(state) = self.list_stack.pop() {
                     // If we just closed a single-item ordered list, consider the next
                     // top-level list as nested one level deeper (common in docs).
-                    if state.ordered && state.items.len() == 1 && self.list_stack.is_empty() {
+                    if state.ordered && state.items == 1 && self.list_stack.is_empty() {
                         self.carry_list_indent_levels = 1;
                     } else if self.list_stack.is_empty() {
                         self.carry_list_indent_levels = 0;
@@ -868,7 +862,7 @@ impl Eq for Descriptor {}
 struct ListState {
     ordered: bool,
     start: u64,
-    items: Vec<ItemMarker>,
+    items: usize,
     extra_levels: usize,
 }
 
@@ -877,16 +871,8 @@ impl ListState {
         Self {
             ordered: n.is_some(),
             start: n.unwrap_or(1),
-            items: Vec::new(),
+            items: 0,
             extra_levels,
         }
     }
-}
-
-#[derive(Debug, Clone)]
-struct ItemMarker {
-    chunk_idx: usize,
-    start: usize,
-    end: usize,
-    indent_len: usize,
 }
