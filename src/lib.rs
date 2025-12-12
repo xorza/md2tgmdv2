@@ -553,12 +553,20 @@ impl Converter {
                 debug_log!("List");
             }
             Tag::Item => {
-                let suppress_newline = self
+                let has_extra_indent = self
                     .list_stack
                     .last()
-                    .map(|s| s.extra_levels > 0 && self.list_stack.len() == 1)
+                    .map(|s| s.extra_levels > 0)
                     .unwrap_or(false);
-                if !suppress_newline {
+                if self.add_new_line
+                    && (self.list_stack.len() > 1
+                        || self.carry_list_indent_levels > 0
+                        || has_extra_indent)
+                {
+                    // When starting a nested list item right after text, consume
+                    // the pending newline instead of emitting an extra blank line.
+                    self.flush_pending_prefix();
+                } else {
                     self.new_line();
                 }
                 let (prefix, indent_len) = self.list_prefix();

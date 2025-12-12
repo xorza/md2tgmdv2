@@ -14,26 +14,21 @@ Below are detailed setups for the main scenarios\.
 Regardless of tooling:
 
 1. *Rust and Cargo installed*
-
   ⦁ Install via `rustup`\.
   ⦁ Ensure it’s on your PATH:```bash
 rustc \-\-version
 cargo \-\-version
 ```
-
   ⦁ If these fail, Codex \(or you\) can’t run `cargo test`\.
 
 2. *You’re in the project root*
-
   ⦁ The directory that has `Cargo\.toml`\.
   ⦁ If you’re not there, `cargo test` will fail or run the wrong project\.
 
 3. *Tests compile*
-
   ⦁ Run once manually:```bash
 cargo test
 ```
-
   ⦁ Fix any compilation errors so future calls are meaningful\.
 
 Once this is true, the only remaining step is wiring the _LLM interface_ to be able to execute that command\.
@@ -69,12 +64,10 @@ You can’t make Copilot itself execute commands, but you can make it trivial to
 ```
 
 Then:
-
   ⦁ Press `Ctrl\+Shift\+P` → “Run Test Task” → “cargo test”\.
   ⦁ Or bind a key to that task\.
 
 2. *Use a terminal dedicated to tests*
-
   ⦁ Keep a terminal open in the project root\.
   ⦁ Any time the model suggests, you just hit:```bash
 cargo test
@@ -135,12 +128,10 @@ System prompt:
 4. *Execution loop*
 
 Your app logic:
-
   ⦁ Send user \+ system messages to the model with the `run\_cargo\_test` tool declared\.
   ⦁ When the model returns a `tool\_call` for `run\_cargo\_test`:
     ⦁ Your backend executes `run\_cargo\_test\(\)` \(runs `cargo test` locally\)\.
     ⦁ Send the output back to the model as a tool result message\.
-
   ⦁ Let the model analyze the test output and fix issues\.
 
 From the model’s perspective, it “can always run `cargo test`” by calling that tool\.
@@ -152,22 +143,18 @@ From the model’s perspective, it “can always run `cargo test`” by calling 
 If your environment is ephemeral===\(Codespaces, dev containers, remote runner\):
 
 1. *Ensure Cargo is preinstalled in the image*
-
   ⦁ Dockerfile \(simplified\):```dockerfile
 FROM rust:latest
 WORKDIR /workspace
 \# copy your project here, or mount it
 ```
-
   ⦁ Now `cargo test` will always be available inside the container\.
 
 2. *Define a repeatable command*
-
   ⦁ `justfile`:```make
 test:
     cargo test
 ```
-
   ⦁ Or `Makefile`:```make
 test:
     cargo test
@@ -181,7 +168,6 @@ make test
 ```
 
 3. *CI*
-
   ⦁ In GitHub Actions:```yaml
 jobs:
   test:
@@ -201,26 +187,21 @@ Now your CI always runs `cargo test`, and you can let the model know “CI runs 
 If your goal is “I’m using an LLM to write Rust, and I want running tests to be frictionless every time it suggests it,” here’s a concrete workflow:
 
 1. *Project root & tools*
-
   ⦁ Open terminal in project root \(where `Cargo\.toml` is\)\.
   ⦁ Confirm:```bash
 cargo test
 ```
 
 2. *Hotkey in terminal*
-
   ⦁ In many terminals you can create a keybinding or use shell history:
     ⦁ Hit ↑ until `cargo test` appears, press Enter\.
-
   ⦁ Or define an alias:```bash
 alias ct\='cargo test'
 ```
 Then run `ct` any time\.
 
 3. *Tell the model your convention*
-
   ⦁ In your first message to the LLM:When you want to verify Rust code, explicitly tell me “Run `cargo test` now” and I’ll run it in my terminal and paste the output back to you\.
-
   ⦁ Then, whenever it says that, you:
     ⦁ Run `cargo test`,
     ⦁ Paste stdout/stderr into the chat\.

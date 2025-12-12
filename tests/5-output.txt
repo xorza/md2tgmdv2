@@ -9,21 +9,17 @@ Below is a very specific, verbose, implementable approach\.
 You need these numbers before you write code:
 
 1. *Model context size*
-
   ⦁ `MODEL\_CONTEXT\_TOKENS` \(e\.g\., 8k / 16k / 32k / 128k\)\.
 
 2. *Reserve room for the model’s answer*
 You can’t use the entire context for input\. Pick:
-
   ⦁ `RESERVED\_OUTPUT\_TOKENS` \(e\.g\., 800–2000 depending on how long answers you want\)
 
 3. *Reserve room for “instructions \+ scaffolding”*
 System prompt \+ policies \+ formatting:
-
   ⦁ `RESERVED\_OVERHEAD\_TOKENS` \(e\.g\., 300–1200\)
 
 4. Compute your *maximum safe input budget*:
-
   ⦁ `MAX\_INPUT\_TOKENS \= MODEL\_CONTEXT\_TOKENS \- RESERVED\_OUTPUT\_TOKENS \- RESERVED\_OVERHEAD\_TOKENS`
 
 Example \(16k model\):
@@ -125,7 +121,7 @@ Do *not* ask the model “summarize this” vaguely\. You want a summary that is
 >
 >You are summarizing a segment of a long user–assistant conversation\.
 >
->PURPOSE: Create a compact summary that can replace the raw messages in===>future prompts\.
+>PURPOSE: Create a compact summary that can replace the raw messages in future===>prompts\.
 >
 >MUST CAPTURE:
 >
@@ -269,7 +265,7 @@ Every time a new message arrives:
   ⦁ select the oldest part of `recent\_messages` \(e\.g\., everything except last 6–10 turns\)
   ⦁ summarize that segment
   ⦁ merge it into `long\_term\_memory` via an “update memory” call
-  ⦁ drop the===summarized raw messages
+  ⦁ drop the summarized raw===messages
 
 *🔸 Update\-memory prompt \(copy/paste\)*
 >
@@ -336,23 +332,18 @@ This pattern scales indefinitely because you always cap each component\.
 *⭐ 10\) Common failure modes \(and how to prevent them\)*
 
 1. *Summaries become too vague*
-
   ⦁ Fix: enforce a schema and require “Key Facts / Constraints” \+ “Decisions” \+ “TODOs”\.
 
 2. *Important numbers/details lost*
-
   ⦁ Fix: explicit instruction: “preserve all numbers, commands, file paths, API names”\.
 
 3. *Memory grows over time*
-
   ⦁ Fix: strict token limit \+ “drop low\-value details” requirement in update\-memory prompt\.
 
 4. *You summarize too late and overflow*
-
   ⦁ Fix: start compressing at \~60–70% of budget, not at 95–100%\.
 
 5. *Model hallucinates missing past context*
-
   ⦁ Fix: in system prompt say: “If not in memory/retrieved context, ask the user or request logs\.”
 
 ————————
