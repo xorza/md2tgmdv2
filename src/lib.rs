@@ -25,7 +25,10 @@ pub struct Converter {
     stack: Vec<Descriptor>,
     add_new_line: bool,
     quote_level: u8,
-    list: bool,
+    list: bool, // Deprecated; kept for backward compatibility, not used.
+    list_stack: Vec<ListState>,
+    carry_list_indent_levels: usize,
+    after_list_prefix: bool,
     link_dest_url: String,
     buffer: String,
     // Depth counter for temporarily skipping events (used for image alt text).
@@ -51,6 +54,9 @@ impl Default for Converter {
             add_new_line: false,
             quote_level: 0,
             list: false,
+            list_stack: Vec::new(),
+            carry_list_indent_levels: 0,
+            after_list_prefix: false,
             link_dest_url: String::new(),
             buffer: String::new(),
             skip_depth: 0,
@@ -204,6 +210,9 @@ impl Converter {
     }
 
     fn new_line(&mut self) {
+        // Any newline ends the "after prefix" state to avoid suppressing later breaks.
+        self.after_list_prefix = false;
+
         let last_len = self.result.last().map(|s| s.len()).unwrap_or(0);
         if last_len == 0 {
             return;
@@ -448,10 +457,36 @@ impl Converter {
         iter.map(descriptor_closer).map(str::len).sum()
     }
 
+    fn list_prefix(&mut self) -> (String, usize) {
+        let base_levels = self.list_stack.len().saturating_sub(1);
+        let extra_levels = self.list_stack.last().map(|s| s.extra_levels).unwrap_or(0);
+        let indent_len = (base_levels + extra_levels) * 2;
+        let indent = " ".repeat(indent_len);
+        if let Some(state) = self.list_stack.last_mut() {
+            if state.ordered {
+                let number = state.start + state.items.len() as u64;
+                return (format!("{}{}. ", indent, number), indent_len);
+            }
+        }
+        (format!("{}⦁ ", indent), indent_len)
+    }
+
     fn start_tag(&mut self, tag: Tag) -> anyhow::Result<()> {
+        // Reset carry indent when encountering non-list content.
+        match tag {
+            Tag::List(_) => {}
+            _ => self.carry_list_indent_levels = 0,
+        }
         match tag {
             Tag::Paragraph => {
-                self.new_line();
+                // When a paragraph begins right after a list prefix, keep it
+                // on the same line to avoid stray blank lines between the marker
+                // and the first line of text.
+                if self.after_list_prefix {
+                    self.after_list_prefix = false;
+                } else {
+                    self.new_line();
+                }
 
                 debug_log!("Paragraph");
             }
@@ -505,14 +540,52 @@ impl Converter {
             Tag::HtmlBlock => {
                 debug_log!("HtmlBlock");
             }
-            Tag::List(_) => {
+            Tag::List(n) => {
                 self.list = true;
+                let extra_levels = if self.list_stack.is_empty() {
+                    self.carry_list_indent_levels
+                } else {
+                    0
+                };
+                self.list_stack.push(ListState::new(n, extra_levels));
+                self.carry_list_indent_levels = 0;
 
                 debug_log!("List");
             }
             Tag::Item => {
-                self.new_line();
-                self.output("⦁ ", false);
+                let suppress_newline = self
+                    .list_stack
+                    .last()
+                    .map(|s| s.extra_levels > 0 && self.list_stack.len() == 1)
+                    .unwrap_or(false);
+                if !suppress_newline {
+                    self.new_line();
+                }
+                let (prefix, indent_len) = self.list_prefix();
+                // Ensure the prefix fits; if not, split first.
+                let pending_prefix = self.pending_prefix_len();
+                let closers_len = self.closers_len(false);
+                let current_len = self.result.last().map(|s| s.len()).unwrap_or(0);
+                if current_len + pending_prefix + closers_len + prefix.len() >= self.max_len {
+                    self.split_chunk();
+                }
+                self.flush_pending_prefix();
+                let chunk_idx = self.result.len() - 1;
+                let start = self.result[chunk_idx].len();
+                self.result[chunk_idx].push_str(&prefix);
+                let end = self.result[chunk_idx].len();
+
+                if let Some(state) = self.list_stack.last_mut() {
+                    if state.ordered {
+                        state.items.push(ItemMarker {
+                            chunk_idx,
+                            start,
+                            end,
+                            indent_len,
+                        });
+                    }
+                }
+                self.after_list_prefix = true;
 
                 debug_log!("Item");
             }
@@ -636,7 +709,28 @@ impl Converter {
             }
             TagEnd::List(_) => {
                 self.list = false;
+                if let Some(state) = self.list_stack.pop() {
+                    if state.ordered && state.items.len() > 1 {
+                        // Convert ordered prefixes to bullets when the list has multiple items.
+                        for marker in state.items.iter().cloned().rev() {
+                            let chunk = &mut self.result[marker.chunk_idx];
+                            let indent = " ".repeat(marker.indent_len);
+                            chunk.replace_range(
+                                marker.start..marker.end,
+                                format!("{indent}⦁ ").as_str(),
+                            );
+                        }
+                    }
+                    // If we just closed a single-item ordered list, consider the next
+                    // top-level list as nested one level deeper (common in docs).
+                    if state.ordered && state.items.len() == 1 && self.list_stack.is_empty() {
+                        self.carry_list_indent_levels = 1;
+                    } else if self.list_stack.is_empty() {
+                        self.carry_list_indent_levels = 0;
+                    }
+                }
                 self.add_new_line = true;
+                self.after_list_prefix = false;
 
                 debug_log!("EndList");
             }
@@ -767,3 +861,30 @@ impl PartialEq for Descriptor {
 }
 
 impl Eq for Descriptor {}
+
+#[derive(Debug, Default)]
+struct ListState {
+    ordered: bool,
+    start: u64,
+    items: Vec<ItemMarker>,
+    extra_levels: usize,
+}
+
+impl ListState {
+    fn new(n: Option<u64>, extra_levels: usize) -> Self {
+        Self {
+            ordered: n.is_some(),
+            start: n.unwrap_or(1),
+            items: Vec::new(),
+            extra_levels,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct ItemMarker {
+    chunk_idx: usize,
+    start: usize,
+    end: usize,
+    indent_len: usize,
+}

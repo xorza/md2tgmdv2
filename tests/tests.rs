@@ -304,13 +304,13 @@ fn asd() {
     );
 }
 
-// #[test]
-// fn asd1() {
-//     transform_expect_1(
-//         "You need\n\n1. **Model**\n- `MODEL` test.",
-//         "```rust\n1234567890\n```\n```java\n1234567890\n```",
-//     );
-// }
+#[test]
+fn asd1() {
+    transform_expect_1(
+        "You need\n\n1. **Model**\n- `MODEL` test.",
+        "You need\n\n1. *Model*\n  ⦁ `MODEL` test\\.",
+    );
+}
 
 #[test]
 fn test1() -> anyhow::Result<()> {
