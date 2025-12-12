@@ -21,6 +21,7 @@ pub struct Converter {
     quote_level: u8,
     list: bool,
     link_dest_url: String,
+    buffer: String,
 }
 
 #[derive(Debug, Clone)]
@@ -30,6 +31,7 @@ enum Descriptor {
     #[allow(dead_code)]
     CodeBlock(String),
     Strikethrough,
+    Code,
 }
 
 impl Default for Converter {
@@ -42,6 +44,7 @@ impl Default for Converter {
             quote_level: 0,
             list: false,
             link_dest_url: String::new(),
+            buffer: String::new(),
         }
     }
 }
@@ -88,9 +91,11 @@ impl Converter {
                     println!("Text {}", txt);
                 }
                 Event::Code(txt) => {
+                    self.stack.push(Descriptor::Code);
                     self.output("`", false);
                     self.output(&txt, true);
                     self.output("`", false);
+                    self.close_descriptor(Descriptor::Code)?;
 
                     println!("Code");
                 }
@@ -130,18 +135,18 @@ impl Converter {
                     println!("HardBreak");
                 }
                 Event::Rule => {
-                    self.output_new_line();
+                    self.new_line();
                     self.output("————————", true);
                     self.add_new_line = true;
 
                     println!("Rule");
                 }
                 Event::TaskListMarker(b) => {
-                    self.output_new_line();
+                    self.new_line();
                     if b {
-                        self.output("[x]", false);
+                        self.output("☑️", false);
                     } else {
-                        self.output("[ ]", false);
+                        self.output("☐", false);
                     }
 
                     println!("TaskListMarker({})", b);
@@ -156,7 +161,7 @@ impl Converter {
         Ok(std::mem::take(&mut self.result))
     }
 
-    fn output_new_line(&mut self) {
+    fn new_line(&mut self) {
         let last = self.result.last_mut().unwrap();
 
         if !last.is_empty() {
@@ -192,12 +197,12 @@ impl Converter {
     fn start_tag(&mut self, tag: Tag) -> anyhow::Result<()> {
         match tag {
             Tag::Paragraph => {
-                self.output_new_line();
+                self.new_line();
 
                 println!("Paragraph");
             }
             Tag::Heading { level, .. } => {
-                self.output_new_line();
+                self.new_line();
                 match level {
                     HeadingLevel::H1 => self.output("**🌟 ", false),
                     HeadingLevel::H2 => self.output("**⭐ ", false),
@@ -220,7 +225,7 @@ impl Converter {
                     CodeBlockKind::Indented => String::new(),
                 };
                 self.output("```", false);
-                self.output(&lang, false);
+                self.output(&lang, true);
                 self.add_new_line = true;
                 self.stack.push(Descriptor::CodeBlock(lang));
 
@@ -235,7 +240,7 @@ impl Converter {
                 println!("List");
             }
             Tag::Item => {
-                self.output_new_line();
+                self.new_line();
                 self.output("⦁ ", false);
 
                 println!("Item");
