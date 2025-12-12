@@ -28,6 +28,7 @@ pub struct Converter {
     list: bool,
     link_dest_url: String,
     buffer: String,
+    skip_depth: u16,
 }
 
 #[derive(Debug, Clone)]
@@ -51,6 +52,7 @@ impl Default for Converter {
             list: false,
             link_dest_url: String::new(),
             buffer: String::new(),
+            skip_depth: 0,
         }
     }
 }
@@ -76,6 +78,14 @@ impl Converter {
 
         let parser = Parser::new_ext(markdown, Options::ENABLE_STRIKETHROUGH);
         for event in parser {
+            if self.skip_depth > 0 {
+                match &event {
+                    Event::Start(_) => self.skip_depth += 1,
+                    Event::End(_) => self.skip_depth -= 1,
+                    _ => {}
+                }
+                continue;
+            }
             match event {
                 Event::Start(tag) => {
                     self.start_tag(tag)?;
@@ -176,7 +186,7 @@ impl Converter {
         if !self.stack.is_empty() {
             return Err(anyhow!("Unbalanced tags"));
         }
-        
+
         for (idx, chunk) in self.result.iter().enumerate() {
             if chunk.len() > self.max_len {
                 return Err(anyhow!(
@@ -540,7 +550,22 @@ impl Converter {
 
                 debug_log!("Link");
             }
-            Tag::Image { .. } => {
+            Tag::Image { dest_url, .. } => {
+                // Render images as a simple link placeholder: [Image](url)
+                self.buffer.clear();
+                self.buffer.push_str("[Image](");
+                push_escaped(&mut self.buffer, &dest_url);
+                self.buffer.push(')');
+
+                let mut link = String::new();
+                std::mem::swap(&mut self.buffer, &mut link);
+                self.output_unbreakable(link.as_str(), false);
+                self.buffer = link;
+                self.buffer.clear();
+
+                // Skip any nested alt-text events until the matching end tag.
+                self.skip_depth = 1;
+
                 debug_log!("Image");
             }
             Tag::MetadataBlock(_) => {

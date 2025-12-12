@@ -176,6 +176,14 @@ fn escapes_parentheses_in_link_url() {
 }
 
 #[test]
+fn renders_image_as_link() {
+    transform_expect_1(
+        "![logo](https://example.com/path(a)/img.png)",
+        "[Image](https://example\\.com/path\\(a\\)/img\\.png)",
+    );
+}
+
+#[test]
 fn heading_followed_by_list_without_blank_line() {
     transform_expect_1("## Heading\n- item", "**⭐ Heading**\n\n⦁ item");
 }
