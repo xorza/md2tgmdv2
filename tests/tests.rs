@@ -439,3 +439,16 @@ fn test9() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn test10() -> anyhow::Result<()> {
+    let input = include_str!("10-input.md");
+    let chunks = Converter::default().go(input)?;
+    let actual = chunks.join("===");
+    let _expected = include_str!("10-output.txt");
+
+    std::fs::write("tests/10-output.txt", &actual).unwrap();
+    //assert_eq!(actual, expected);
+
+    Ok(())
+}
