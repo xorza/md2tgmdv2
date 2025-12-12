@@ -297,6 +297,14 @@ fn url_not_split_across_chunks() {
 }
 
 #[test]
+fn asd() {
+    transform_expect_1(
+        "```rust\n1234567890\n```\n```java\n1234567890\n```",
+        "```rust\n1234567890\n```\n```java\n1234567890\n```",
+    );
+}
+
+#[test]
 fn test1() -> anyhow::Result<()> {
     let input = include_str!("1-input.md");
     let chunks = Converter::default().go(input)?;

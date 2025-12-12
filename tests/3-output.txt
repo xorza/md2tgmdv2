@@ -17,7 +17,7 @@ Regardless of tooling:
 **Rust and Cargo installed**
 
 ⦁ Install via `rustup`\.
-⦁ Ensure it’s on your PATH:===```bash
+⦁ Ensure it’s on your PATH:```bash
 rustc \-\-version
 cargo \-\-version
 ```
@@ -33,7 +33,7 @@ cargo \-\-version
 ⦁ 
 **Tests compile**
 
-⦁ Run once manually:===```bash
+⦁ Run once manually:```bash
 cargo test
 ```
 
@@ -52,7 +52,8 @@ You can’t make Copilot itself execute commands, but you can make it trivial to
 ⦁ 
 **Add a VS Code task for `cargo test`**
 
-`\.vscode/tasks\.json`:===```json
+`\.vscode/tasks\.json`:
+```json
 \{
   "version": "2\.0\.0",
   "tasks": \[
@@ -80,7 +81,7 @@ Then:
 **Use a terminal dedicated to tests**
 
 ⦁ Keep a terminal open in the project root\.
-⦁ Any time the model suggests, you just hit:===```bash
+⦁ Any time the model suggests, you just hit:```bash
 cargo test
 ```
 
@@ -95,7 +96,8 @@ If you’re building your own app around an OpenAI code model and want the model
 ⦁ 
 **Define a tool / function that runs tests**
 
-Conceptually:===```python
+Conceptually:
+```python
 import subprocess
 
 def run\_cargo\_test\(\):
@@ -115,7 +117,8 @@ def run\_cargo\_test\(\):
 ⦁ 
 **Expose it as a tool to the model**
 
-In your tool schema \(pseudo‑JSON\):===```json
+In your tool schema \(pseudo‑JSON\):
+```json
 \{
   "type": "function",
   "function": \{
@@ -155,12 +158,12 @@ From the model’s perspective, it “can always run `cargo test`” by calling 
 
 **⭐ 4\. In a dev container / Codespaces / CI pipeline**
 
-If your environment is ephemeral \(Codespaces, dev containers, remote runner\):
+If your environment is===ephemeral \(Codespaces, dev containers, remote runner\):
 
 ⦁ 
 **Ensure Cargo is preinstalled in the image**
 
-⦁ Dockerfile \(simplified\):===```dockerfile
+⦁ Dockerfile \(simplified\):```dockerfile
 FROM rust:latest
 WORKDIR /workspace
 \# copy your project here, or mount it
@@ -171,17 +174,18 @@ WORKDIR /workspace
 ⦁ 
 **Define a repeatable command**
 
-⦁ `justfile`:===```make
+⦁ `justfile`:```make
 test:
     cargo test
 ```
 
-⦁ Or `Makefile`:===```make
+⦁ Or `Makefile`:```make
 test:
     cargo test
 ```
 
-Then any time:===```bash
+Then any time:
+```bash
 just test
 \# or
 make test
@@ -190,7 +194,7 @@ make test
 ⦁ 
 **CI**
 
-⦁ In GitHub Actions:===```yaml
+⦁ In GitHub Actions:```yaml
 jobs:
   test:
     runs\-on: ubuntu\-latest
@@ -212,7 +216,7 @@ If your goal is “I’m using an LLM to write Rust, and I want running tests to
 **Project root & tools**
 
 ⦁ Open terminal in project root \(where `Cargo\.toml` is\)\.
-⦁ Confirm:===```bash
+⦁ Confirm:```bash
 cargo test
 ```
 
@@ -222,7 +226,7 @@ cargo test
 ⦁ In many terminals you can create a keybinding or use shell history:
 ⦁ Hit ↑ until `cargo test` appears, press Enter\.
 
-⦁ Or define an alias:===```bash
+⦁ Or define an alias:```bash
 alias ct\='cargo test'
 ```
 Then run `ct` any time\.

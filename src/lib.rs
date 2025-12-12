@@ -474,11 +474,6 @@ impl Converter {
                 debug_log!("BlockQuote");
             }
             Tag::CodeBlock(kind) => {
-                if let Some(last) = self.result.last() {
-                    if !last.is_empty() {
-                        self.split_chunk();
-                    }
-                }
                 let lang = match kind {
                     CodeBlockKind::Fenced(lang) => lang.to_string(),
                     CodeBlockKind::Indented => String::new(),
