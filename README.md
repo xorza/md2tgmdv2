@@ -4,7 +4,7 @@ Telegram MarkdownV2 renderer used to post LLM output into a Telegram bot.
 
 ## Status
 - Early, unstable, API may change without notice.
-- Some Markdown constructs are intentionally unsupported; images and tables are currently skipped instead of rendered.
+- Some Markdown constructs are intentionally limited; tables are skipped. Images are rendered as `[Image](url)` placeholders.
 
 ## What it does
 - Parses Markdown and emits Telegram-safe MarkdownV2, splitting messages to respect Telegram’s 4096 character limit.
