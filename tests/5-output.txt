@@ -234,7 +234,7 @@ Every time a new message arrives:
   ⦁ merge it into `long\_term\_memory` via an “update memory” call
   ⦁ drop the summarized raw messages
 
-*🔸 Update\-memory=== prompt \(copy/paste\)*
+*🔸 Update\-memory===prompt \(copy/paste\)*
 >You maintain a bounded long\-term memory of a user–assistant conversation\.
 >
 >CURRENT MEMORY:
