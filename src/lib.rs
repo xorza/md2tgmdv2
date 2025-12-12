@@ -28,6 +28,7 @@ pub struct Converter {
     list: bool,
     link_dest_url: String,
     buffer: String,
+    // Depth counter for temporarily skipping events (used for image alt text).
     skip_depth: u16,
 }
 
@@ -79,6 +80,7 @@ impl Converter {
         let parser = Parser::new_ext(markdown, Options::ENABLE_STRIKETHROUGH);
         for event in parser {
             if self.skip_depth > 0 {
+                // When skipping (e.g., image alt text), keep depth balanced.
                 match &event {
                     Event::Start(_) => self.skip_depth += 1,
                     Event::End(_) => self.skip_depth -= 1,
@@ -322,7 +324,7 @@ impl Converter {
             let mut take = split_point(remaining, available);
             let forced_split = if take == 0 {
                 // No safe split point within available space: fall back to a hard split
-                // at the available boundary to guarantee forward progress.
+                // at the available boundary to guarantee forward progress (prevents loops).
                 take = available;
                 true
             } else {
@@ -563,7 +565,8 @@ impl Converter {
                 self.buffer = link;
                 self.buffer.clear();
 
-                // Skip any nested alt-text events until the matching end tag.
+                // Skip any nested alt-text events until the matching end tag to
+                // avoid emitting the alt content (Telegram won't render it).
                 self.skip_depth = 1;
 
                 debug_log!("Image");
