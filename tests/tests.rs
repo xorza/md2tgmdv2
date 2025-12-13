@@ -196,20 +196,21 @@ fn heading_followed_by_list_without_blank_line() {
     transform_expect_1("## Heading\n- item", "*⭐ Heading*\n⦁ item");
 }
 
-// #[test]
-// fn converts_thematic_break_to_em_dash_bar() {
-//     transform_expect_1(
-//         "some test\n\n---\n\nsome more test",
-//         "some test\n\n————————\n\nsome more test",
-//     );
-// }
-// #[test]
-// fn converts_thematic_break_after_line_to_heading() {
-//     transform_expect_1(
-//         "some test\n---\nsome more test",
-//         "*⭐ some test*\nsome more test",
-//     );
-// }
+#[test]
+fn converts_thematic_break_to_em_dash_bar() {
+    transform_expect_1(
+        "some test\n\n---\n\nsome more test",
+        "some test\n\n———\n\nsome more test",
+    );
+}
+
+#[test]
+fn converts_thematic_break_after_line_to_heading() {
+    transform_expect_1(
+        "some test\n---\nsome more test",
+        "*⭐ some test*\nsome more test",
+    );
+}
 
 // #[test]
 // fn preserves_newlines_around_list() {

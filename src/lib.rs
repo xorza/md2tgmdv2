@@ -311,8 +311,7 @@ impl Converter {
                 }
                 Event::Rule => {
                     self.new_line();
-                    self.text("———");
-                    self.new_line();
+                    self.text("\n———\n");
                     self.new_line();
 
                     println!("Rule");
