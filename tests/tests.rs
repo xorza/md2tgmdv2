@@ -212,26 +212,26 @@ fn converts_thematic_break_after_line_to_heading() {
     );
 }
 
-// #[test]
-// fn preserves_newlines_around_list() {
-//     let input = "- text\n\nmore text";
-//     let expected = "⦁ text\n\nmore text";
-//     transform_expect_1(input, expected);
-// }
+#[test]
+fn preserves_newlines_around_list() {
+    let input = "- text\n\nmore text";
+    let expected = "⦁ text\nmore text";
+    transform_expect_1(input, expected);
+}
 
-// #[test]
-// fn converts_blockquote_with_list_and_bold() {
-//     let input = "> - Any explicit\n>\n> **text**\n> - greetings";
-//     let expected = ">⦁ Any explicit\n>\n>*text*\n>⦁ greetings";
-//     transform_expect_1(input, expected);
-// }
+#[test]
+fn converts_blockquote_with_list_and_bold() {
+    let input = "> - Any explicit\n>\n> **text**\n> - greetings";
+    let expected = ">⦁ Any explicit\n>*text*\n>⦁ greetings";
+    transform_expect_1(input, expected);
+}
 
-// #[test]
-// fn converts_blockquote_heading_and_list_item() {
-//     let input = "> **GOAL:**\n> - Merge.";
-//     let expected = ">*GOAL:*\n>⦁ Merge\\.";
-//     transform_expect_1(input, expected);
-// }
+#[test]
+fn converts_blockquote_heading_and_list_item() {
+    let input = "> **GOAL:**\n> - Merge.";
+    let expected = ">*GOAL:*\n>⦁ Merge\\.";
+    transform_expect_1(input, expected);
+}
 
 // #[test]
 // fn splits_words_to_fit_len_5() {
