@@ -262,6 +262,11 @@ impl Converter {
             return Err(anyhow!("Unbalanced tags"));
         }
 
+        for chunk in &mut self.result {
+            let trimmed_len = chunk.trim_end().len();
+            chunk.truncate(trimmed_len);
+        }
+
         Ok(std::mem::take(&mut self.result))
     }
 
