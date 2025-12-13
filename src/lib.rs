@@ -67,7 +67,9 @@ impl Converter {
     }
 
     fn new_line(&mut self) {
-        self.new_line = true;
+        if !self.result.last_mut().unwrap().is_empty() {
+            self.new_line = true;
+        }
     }
 
     fn url(&mut self, txt: &str, url: &str) {
@@ -106,14 +108,16 @@ impl Converter {
                         self.prefix.push(' ');
                     }
                 }
-                let index = self.stack.iter_mut().rev().find_map(|d| match d {
-                    Descriptor::List {
-                        ordered: true,
-                        index,
-                    } => Some(index),
-                    _ => None,
-                });
-                if let Some(index) = index {
+                let (ordered, index) = self
+                    .stack
+                    .iter_mut()
+                    .rev()
+                    .find_map(|d| match d {
+                        Descriptor::List { ordered, index } => Some((*ordered, index)),
+                        _ => None,
+                    })
+                    .expect("No list found");
+                if ordered {
                     self.prefix.push_str(&format!("{}\\. ", index));
                     *index += 1;
                 } else {
@@ -387,11 +391,12 @@ impl Converter {
                 };
                 self.stack.push(desc);
 
-                println!("List");
+                println!("List {:?}", list);
             }
             Tag::Item => {
                 self.stack.push(Descriptor::ListItem);
                 self.prefix(Descriptor::ListItem);
+                self.new_line();
 
                 println!("Item");
             }

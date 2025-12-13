@@ -171,6 +171,14 @@ fn converts_ordered_list_to_bullets() {
 }
 
 #[test]
+fn nested_lists() {
+    transform_expect_1(
+        "1. First\n   - Second\n2. Third",
+        "1\\. First\n  ⦁ Second\n2\\. Third",
+    );
+}
+
+#[test]
 fn preserves_nested_blockquote_levels() {
     transform_expect_1("> > Nested", ">>Nested");
 }
