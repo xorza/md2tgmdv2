@@ -114,91 +114,87 @@ fn preserves_blockquote_blank_line_between_lines() {
     transform_expect_1("> You\n> \n> Hi", ">You\n>Hi");
 }
 
-// #[test]
-// fn converts_list_items_inside_blockquote() {
-//     transform_expect_1(
-//         "> - Greetings\n> - Repetitive",
-//         ">⦁ Greetings\n>⦁ Repetitive",
-//     );
-// }
+#[test]
+fn converts_list_items_inside_blockquote() {
+    transform_expect_1(
+        "> - Greetings\n> - Repetitive",
+        ">⦁ Greetings\n>⦁ Repetitive",
+    );
+}
 
-// #[test]
-// fn converts_bold_inside_blockquote() {
-//     transform_expect_1("> **GOAL:** ", ">*GOAL:*");
-// }
+#[test]
+fn converts_bold_inside_blockquote() {
+    transform_expect_1("> **GOAL:** ", ">*GOAL:*");
+}
 
-// #[test]
-// fn preserves_blockquote_blank_line_before_heading() {
-//     transform_expect_1(
-//         "> - Any decisions made, final answers given, or conclusions reached\n\
-//          > - Any explicit open questions or TODO items mentioned\n\
-//          > \n\
-//          > **EXCLUDE OR MINIMIZE:**\n\
-//          > - Greetings, small talk, and filler conversation\n\
-//          > - Repetitive text that adds no new information\n",
-//         ">⦁ Any decisions made, final answers given, or conclusions reached\n\
-//          >⦁ Any explicit open questions or TODO items mentioned\n\
-//          >\n\
-//          >*EXCLUDE OR MINIMIZE:*\n\
-//          >⦁ Greetings, small talk, and filler conversation\n\
-//          >⦁ Repetitive text that adds no new information",
-//     );
-// }
+#[test]
+fn preserves_blockquote_blank_line_before_heading() {
+    transform_expect_1(
+        "> - Any decisions made, final answers given, or conclusions reached\n\
+         > - Any explicit open questions or TODO items mentioned\n\
+         > \n\
+         > **EXCLUDE OR MINIMIZE:**\n\
+         > - Greetings, small talk, and filler conversation\n\
+         > - Repetitive text that adds no new information\n",
+        ">⦁ Any decisions made, final answers given, or conclusions reached\n\
+         >⦁ Any explicit open questions or TODO items mentioned\n\
+         >*EXCLUDE OR MINIMIZE:*\n\
+         >⦁ Greetings, small talk, and filler conversation\n\
+         >⦁ Repetitive text that adds no new information",
+    );
+}
 
-// #[test]
-// fn preserves_blockquote_with_empty_line_without_split() {
-//     transform_expect_1(
-//         "> 1234567890\n> \n> 1234567890",
-//         ">1234567890\n>\n>1234567890",
-//     );
-// }
+#[test]
+fn preserves_blockquote_with_empty_line_without_split() {
+    transform_expect_1("> 1234567890\n> \n> 1234567890", ">1234567890\n>1234567890");
+}
 
-// #[test]
-// fn keeps_angle_bracket_text_inline() {
-//     transform_expect_1(
-//         ">hello <insert segment_summary>  ",
-//         ">hello <insert segment\\_summary\\>",
-//     );
-// }
+#[test]
+fn keeps_angle_bracket_text_inline() {
+    transform_expect_1(
+        ">hello <insert segment_summary>  ",
+        ">hello <insert segment\\_summary\\>",
+    );
+}
 
-// #[test]
-// fn keeps_angle_bracket_text_on_own_line() {
-//     transform_expect_1(
-//         "> <insert segment_summary>  ",
-//         "><insert segment\\_summary\\>",
-//     );
-// }
+#[test]
+fn keeps_angle_bracket_text_on_own_line() {
+    transform_expect_1(
+        "> <insert segment_summary>  ",
+        "><insert segment\\_summary\\>",
+    );
+}
 
-// #[test]
-// fn converts_ordered_list_to_bullets() {
-//     transform_expect_1("1. First\n2. Second", "1\\. First\n2\\. Second");
-// }
+#[test]
+fn converts_ordered_list_to_bullets() {
+    transform_expect_1("1. First\n2. Second", "1\\. First\n2\\. Second");
+}
 
-// #[test]
-// fn preserves_nested_blockquote_levels() {
-//     transform_expect_1("> > Nested", ">>Nested");
-// }
+#[test]
+fn preserves_nested_blockquote_levels() {
+    transform_expect_1("> > Nested", ">>Nested");
+}
 
-// #[test]
-// fn escapes_parentheses_in_link_url() {
-//     transform_expect_1(
-//         "[see docs](https://example.com/path(a)/page)",
-//         "[see docs](https://example\\.com/path\\(a\\)/page)",
-//     );
-// }
+#[test]
+fn escapes_parentheses_in_link_url() {
+    transform_expect_1(
+        "[see docs](https://example.com/path(a)/page)",
+        "[see docs](https://example\\.com/path\\(a\\)/page)",
+    );
+}
 
-// #[test]
-// fn renders_image_as_link() {
-//     transform_expect_1(
-//         "![logo](https://example.com/path(a)/img.png)",
-//         "[Image](https://example\\.com/path\\(a\\)/img\\.png)",
-//     );
-// }
+#[test]
+fn renders_image_as_link() {
+    transform_expect_1(
+        "![logo](https://example.com/path(a)/img.png)",
+        "[logo](https://example\\.com/path\\(a\\)/img\\.png)",
+    );
+}
 
-// #[test]
-// fn heading_followed_by_list_without_blank_line() {
-//     transform_expect_1("## Heading\n- item", "*⭐ Heading*\n⦁ item");
-// }
+#[test]
+fn heading_followed_by_list_without_blank_line() {
+    transform_expect_1("## Heading\n- item", "*⭐ Heading*\n⦁ item");
+}
 
 // #[test]
 // fn converts_thematic_break_to_em_dash_bar() {

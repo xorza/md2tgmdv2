@@ -484,6 +484,7 @@ impl Converter {
                     "Unexpected end of list"
                 );
                 self.postfix(desc);
+                self.new_line();
 
                 println!("EndHeading");
             }
