@@ -72,18 +72,18 @@ fn converts_bold_and_italics() {
     );
 }
 
-// #[test]
-// fn converts_heading_to_star_heading() {
-//     transform_expect_1("## 1. What", "*⭐ 1\\. What*");
-// }
+#[test]
+fn converts_heading_to_star_heading() {
+    transform_expect_1("## 1. What", "*⭐ 1\\. What*");
+}
 
-// #[test]
-// fn escapes_inline_code_markers() {
-//     transform_expect_1(
-//         "`messages = [{role: \"user\"|\"assistant\", content: string}, …]`",
-//         "`messages \\= \\[\\{role: \"user\"\\|\"assistant\", content: string\\}, …\\]`",
-//     );
-// }
+#[test]
+fn escapes_inline_code_markers() {
+    transform_expect_1(
+        "`messages = [{role: \"user\"|\"assistant\", content: string}, …]`",
+        "`messages \\= \\[\\{role: \"user\"\\|\"assistant\", content: string\\}, …\\]`",
+    );
+}
 
 // #[test]
 // fn converts_list_after_blank_line() {

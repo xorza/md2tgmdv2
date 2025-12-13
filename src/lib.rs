@@ -259,6 +259,7 @@ impl Converter {
                     println!("Text {}", txt);
                 }
                 Event::Code(txt) => {
+                    self.prefix(Descriptor::Code);
                     self.stack.push(Descriptor::Code);
                     self.text(&escape_text(&txt));
                     self.stack.pop();
