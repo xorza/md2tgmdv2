@@ -223,7 +223,7 @@ impl Converter {
             Tag::HtmlBlock => {
                 println!("HtmlBlock");
             }
-            Tag::List(_) => {
+            Tag::List(list) => {
                 self.list = true;
 
                 println!("List");
