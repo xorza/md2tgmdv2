@@ -109,10 +109,10 @@ fn escapes_inside_code_block_language() {
     );
 }
 
-// #[test]
-// fn preserves_blockquote_blank_line_between_lines() {
-//     transform_expect_1("> You\n> \n> Hi", ">You\n>\n>Hi");
-// }
+#[test]
+fn preserves_blockquote_blank_line_between_lines() {
+    transform_expect_1("> You\n> \n> Hi", ">You\n>Hi");
+}
 
 // #[test]
 // fn converts_list_items_inside_blockquote() {

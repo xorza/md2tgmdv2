@@ -52,7 +52,7 @@ impl Default for Converter {
             stack: Vec::new(),
             quote_level: 0,
             link: None,
-            new_line: true,
+            new_line: false,
             prefix: String::new(),
         }
     }
@@ -67,11 +67,6 @@ impl Converter {
     }
 
     fn new_line(&mut self) {
-        let last = self.result.last_mut().unwrap();
-        last.push_str("\n");
-        if self.quote_level > 0 {
-            last.push_str(&">".repeat(self.quote_level as usize));
-        }
         self.new_line = true;
     }
 
@@ -83,9 +78,17 @@ impl Converter {
 
     fn text(&mut self, txt: &str) {
         let last = self.result.last_mut().unwrap();
+
+        if self.new_line {
+            last.push_str("\n");
+            if self.quote_level > 0 {
+                last.push_str(&">".repeat(self.quote_level as usize));
+            }
+            self.new_line = false;
+        }
+
         last.push_str(&std::mem::take(&mut self.prefix));
         last.push_str(txt);
-        self.new_line = false;
     }
 
     fn prefix(&mut self, desc: Descriptor) {
@@ -360,6 +363,7 @@ impl Converter {
             }
             Tag::BlockQuote(_) => {
                 self.quote_level += 1;
+                self.prefix.push('>');
 
                 println!("BlockQuote");
             }
