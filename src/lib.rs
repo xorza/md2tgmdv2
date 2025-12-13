@@ -19,7 +19,9 @@ pub struct Converter {
     stack: Vec<Descriptor>,
     quote_level: u8,
     link: Option<Link>,
-    prefix: String,
+
+    // use for operations on temporary strings to avoid allocations
+    buffer: String,
 }
 
 #[derive(Debug)]
@@ -49,7 +51,8 @@ impl Default for Converter {
             stack: Vec::new(),
             quote_level: 0,
             link: None,
-            prefix: String::new(),
+            
+            buffer: String::new(),
         }
     }
 }
