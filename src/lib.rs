@@ -18,8 +18,14 @@ pub struct Converter {
     result: Vec<String>,
     stack: Vec<Descriptor>,
     quote_level: u8,
-    link_dest_url: Option<String>,
+    link: Option<Link>,
     prefix: String,
+}
+
+#[derive(Debug)]
+pub struct Link {
+    url: String,
+    title: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -30,6 +36,8 @@ enum Descriptor {
     Strikethrough,
     Code,
     List { ordered: bool, index: u32 },
+    Heading(u8),
+    ListItem,
 }
 
 impl Default for Converter {
@@ -40,7 +48,7 @@ impl Default for Converter {
 
             stack: Vec::new(),
             quote_level: 0,
-            link_dest_url: None,
+            link: None,
             prefix: String::new(),
         }
     }
@@ -104,20 +112,19 @@ impl Converter {
                     self.end_tag(tag)?;
                 }
                 Event::Text(txt) => {
-                    let url = self.link_dest_url.take();
-                    match url {
+                    match self.link.as_mut() {
+                        Some(link) => {
+                            link.title.push_str(&txt);
+                        }
                         None => self.text(&txt, true),
-                        Some(url) => self.url(&txt, &url),
                     }
 
                     println!("Text {}", txt);
                 }
                 Event::Code(txt) => {
                     self.stack.push(Descriptor::Code);
-                    self.text("`", false);
                     self.text(&txt, true);
-                    self.text("`", false);
-                    self.close_descriptor(Descriptor::Code)?;
+                    self.stack.pop();
 
                     println!("Code");
                 }
@@ -157,10 +164,7 @@ impl Converter {
                     println!("HardBreak");
                 }
                 Event::Rule => {
-                    self.new_line();
-                    self.text("————————", true);
-                    self.new_line();
-                    self.new_line();
+                    self.text("\n————————\n\n", false);
 
                     println!("Rule");
                 }
@@ -189,15 +193,21 @@ impl Converter {
                 println!("Paragraph");
             }
             Tag::Heading { level, .. } => {
-                self.new_line();
-                match level {
-                    HeadingLevel::H1 => self.text("*🌟 ", false),
-                    HeadingLevel::H2 => self.text("*⭐ ", false),
-                    HeadingLevel::H3 => self.text("*✨ ", false),
-                    HeadingLevel::H4 => self.text("*🔸 ", false),
-                    HeadingLevel::H5 => self.text("_🔹 ", false),
-                    HeadingLevel::H6 => self.text("_✴️ ", false),
-                }
+                let level = match level {
+                    HeadingLevel::H1 => 1,
+                    HeadingLevel::H2 => 2,
+                    HeadingLevel::H3 => 3,
+                    HeadingLevel::H4 => 4,
+                    HeadingLevel::H5 => 5,
+                    HeadingLevel::H6 => 6,
+                };
+                self.stack.push(Descriptor::Heading(level));
+                //self.prefix("*🌟 "),
+                // self.prefix("*⭐ "),
+                // self.prefix("*✨ "),
+                // self.prefix("*🔸 "),
+                // self.prefix("_🔹 "),
+                // self.prefix("_✴️ "),
 
                 println!("Heading");
             }
@@ -211,9 +221,6 @@ impl Converter {
                     CodeBlockKind::Fenced(lang) => lang.to_string(),
                     CodeBlockKind::Indented => String::new(),
                 };
-                self.text("```", false);
-                self.text(&lang, true);
-                self.new_line();
                 self.stack.push(Descriptor::CodeBlock(lang));
 
                 println!("CodeBlock");
@@ -231,7 +238,8 @@ impl Converter {
                 println!("List");
             }
             Tag::Item => {
-                self.text("⦁ ", false);
+                // self.prefix("⦁ ");
+                self.stack.push(Descriptor::ListItem);
 
                 println!("Item");
             }
@@ -257,32 +265,35 @@ impl Converter {
                 println!("Superscript");
             }
             Tag::Emphasis => {
-                self.text("_", false);
                 self.stack.push(Descriptor::Emphasis);
 
                 println!("Emphasis");
             }
             Tag::Strong => {
-                self.text("*", false);
                 self.stack.push(Descriptor::Strong);
 
                 println!("Strong");
             }
             Tag::Strikethrough => {
-                self.text("~~", false);
                 self.stack.push(Descriptor::Strikethrough);
 
                 println!("Strikethrough");
             }
             Tag::Link { dest_url, .. } => {
-                assert!(self.link_dest_url.is_none());
-
-                self.link_dest_url = Some(dest_url.to_string());
+                assert!(self.link.is_none());
+                self.link = Some(Link {
+                    url: dest_url.to_string(),
+                    title: String::new(),
+                });
 
                 println!("Link");
             }
             Tag::Image { dest_url, .. } => {
-                self.url("Image", &dest_url);
+                assert!(self.link.is_none());
+                self.link = Some(Link {
+                    url: dest_url.to_string(),
+                    title: String::new(),
+                });
 
                 println!("Image");
             }
@@ -310,15 +321,12 @@ impl Converter {
 
                 println!("EndParagraph");
             }
-            TagEnd::Heading(level) => {
-                match level {
-                    HeadingLevel::H1 => self.text("*", false),
-                    HeadingLevel::H2 => self.text("*", false),
-                    HeadingLevel::H3 => self.text("*", false),
-                    HeadingLevel::H4 => self.text("*", false),
-                    HeadingLevel::H5 => self.text("_", false),
-                    HeadingLevel::H6 => self.text("_", false),
-                }
+            TagEnd::Heading(_) => {
+                let desc = self.stack.pop().expect("Unexpected end of list");
+                assert!(
+                    matches!(desc, Descriptor::Heading { .. }),
+                    "Unexpected end of list"
+                );
 
                 println!("EndHeading");
             }
@@ -328,9 +336,11 @@ impl Converter {
                 println!("EndBlockQuote");
             }
             TagEnd::CodeBlock => {
-                self.text("```", false);
-                self.new_line();
-                self.close_descriptor(Descriptor::CodeBlock(String::new()))?;
+                let desc = self.stack.pop().expect("Unexpected end of list");
+                assert!(
+                    matches!(desc, Descriptor::CodeBlock { .. }),
+                    "Unexpected end of list"
+                );
 
                 println!("EndCodeBlock");
             }
@@ -347,7 +357,11 @@ impl Converter {
                 println!("EndList");
             }
             TagEnd::Item => {
-                self.new_line();
+                let desc = self.stack.pop().expect("Unexpected end of list");
+                assert!(
+                    matches!(desc, Descriptor::ListItem),
+                    "Unexpected end of list"
+                );
 
                 println!("EndItem");
             }
@@ -375,25 +389,42 @@ impl Converter {
                 println!("EndSuperscript");
             }
             TagEnd::Emphasis => {
-                self.text("_", false);
-                self.close_descriptor(Descriptor::Emphasis)?;
+                let desc = self.stack.pop().expect("Unexpected end of list");
+                assert!(
+                    matches!(desc, Descriptor::Emphasis),
+                    "Unexpected end of list"
+                );
 
                 println!("EndEmphasis");
             }
             TagEnd::Strong => {
-                self.text("*", false);
-                self.close_descriptor(Descriptor::Strong)?;
+                let desc = self.stack.pop().expect("Unexpected end of list");
+                assert!(matches!(desc, Descriptor::Strong), "Unexpected end of list");
 
                 println!("EndStrong");
             }
             TagEnd::Strikethrough => {
-                self.text("~~", false);
-                self.close_descriptor(Descriptor::Strikethrough)?;
+                let desc = self.stack.pop().expect("Unexpected end of list");
+                assert!(
+                    matches!(desc, Descriptor::Strikethrough),
+                    "Unexpected end of list"
+                );
             }
             TagEnd::Link => {
+                let link = self.link.take().expect("Unexpected end of list");
+                self.url(&link.title, &link.url);
+
                 println!("EndLink");
             }
             TagEnd::Image => {
+                let link = self.link.take().expect("Unexpected end of list");
+                let title = if link.title.is_empty() {
+                    "Image".to_string()
+                } else {
+                    link.title.clone()
+                };
+                self.url(&title, &link.url);
+
                 println!("EndImage");
             }
             TagEnd::MetadataBlock(_) => {
@@ -409,13 +440,6 @@ impl Converter {
                 println!("EndDefinitionListDefinition");
             }
         }
-
-        Ok(())
-    }
-
-    fn close_descriptor(&mut self, descriptor: Descriptor) -> anyhow::Result<()> {
-        let last = self.stack.pop().expect("Unexpected end tag");
-        assert_eq!(last, descriptor, "Unexpected end tag");
 
         Ok(())
     }
