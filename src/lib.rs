@@ -51,7 +51,7 @@ impl Default for Converter {
             stack: Vec::new(),
             quote_level: 0,
             link: None,
-            
+
             buffer: String::new(),
         }
     }
@@ -84,10 +84,75 @@ impl Converter {
 
         let last = self.result.last_mut().unwrap();
         last.push_str(txt);
+        // Suffix collected in `self.buffer` inside `build_prefix`.
+        last.push_str(&self.buffer);
+        self.buffer.clear();
     }
 
-    fn build_prefix(&mut self) {
-        // todo
+    fn build_prefix(&mut self) -> String {
+        // Clear reusable buffer that will hold the suffix.
+        self.buffer.clear();
+
+        // Render list indentation + bullet when we are inside a list item and the
+        // current line is otherwise empty (apart from blockquote markers).
+        if self.stack.iter().any(|d| matches!(d, Descriptor::ListItem)) {
+            // Depth = number of lists currently on the stack.
+            let depth = self
+                .stack
+                .iter()
+                .filter(|d| matches!(d, Descriptor::List { .. }))
+                .count();
+
+            // Two spaces per nesting level (skip the first level).
+            if depth > 1 {
+                for _ in 0..((depth - 1) * 2) {
+                    self.buffer.push(' ');
+                }
+            }
+
+            self.buffer.push_str("⦁ ");
+        }
+
+        // Build prefix and suffix for inline formatting. We open from outermost to
+        // innermost, and close in reverse order by accumulating into `self.buffer`.
+        for desc in self.stack.iter() {
+            match desc {
+                Descriptor::Heading(level) => {
+                    let marker = match level {
+                        1 => "**🌟 ",
+                        2 => "**⭐ ",
+                        3 => "**✨ ",
+                        4 => "**🔸 ",
+                        5 => "__🔹 ",
+                        _ => "__✴️ ",
+                    };
+                    self.buffer.push_str(marker);
+                }
+                Descriptor::CodeBlock(lang) => {
+                    let lang = escape_text(lang);
+                    self.buffer.push_str("```");
+                    self.buffer.push_str(&lang);
+                    self.buffer.push('\n');
+                }
+                Descriptor::Strong => {
+                    self.buffer.push_str("**");
+                }
+                Descriptor::Emphasis => {
+                    self.buffer.push('_');
+                }
+                Descriptor::Strikethrough => {
+                    self.buffer.push('~');
+                }
+                Descriptor::Code => {
+                    self.buffer.push('`');
+                }
+                Descriptor::List { .. } | Descriptor::ListItem => {
+                    // Already handled indentation/bullet above.
+                }
+            }
+        }
+
+        return std::mem::take(&mut self.buffer);
     }
 
     /// Convert Markdown into Telegram MarkdownV2 and split into safe chunks.
