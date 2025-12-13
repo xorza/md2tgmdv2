@@ -93,8 +93,7 @@ impl Converter {
         // Clear reusable buffer that will hold the suffix.
         self.buffer.clear();
 
-        // Render list indentation + bullet when we are inside a list item and the
-        // current line is otherwise empty (apart from blockquote markers).
+        // Render list indentation + bullet when we are inside a list item
         if self.stack.iter().any(|d| matches!(d, Descriptor::ListItem)) {
             // Depth = number of lists currently on the stack.
             let depth = self
@@ -109,8 +108,19 @@ impl Converter {
                     self.buffer.push(' ');
                 }
             }
-
-            self.buffer.push_str("⦁ ");
+            let index = self.stack.iter_mut().rev().find_map(|d| match d {
+                Descriptor::List {
+                    ordered: true,
+                    index,
+                } => Some(index),
+                _ => None,
+            });
+            if let Some(index) = index {
+                self.buffer.push_str(&format!("{}\\. ", index));
+                *index += 1;
+            } else {
+                self.buffer.push_str("⦁ ");
+            }
         }
 
         // Build prefix and suffix for inline formatting. We open from outermost to
