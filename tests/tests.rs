@@ -41,36 +41,36 @@ fn converts_bold_list_item() {
     transform_expect_1("- **Split** it into", "⦁ *Split* it into");
 }
 
-// #[test]
-// fn preserves_text_before_list() {
-//     transform_expect_1("test\n\n- **Split** it into", "test\n⦁ *Split* it into");
-// }
+#[test]
+fn preserves_text_before_list() {
+    transform_expect_1("test\n\n- **Split** it into", "test\n⦁ *Split* it into");
+}
 
-// #[test]
-// fn preserves_text_before_list1() {
-//     transform_expect_1("test\n- **Split** it into", "test\n⦁ *Split* it into");
-// }
+#[test]
+fn preserves_text_before_list1() {
+    transform_expect_1("test\n- **Split** it into", "test\n⦁ *Split* it into");
+}
 
-// #[test]
-// fn escapes_parentheses_in_text() {
-//     transform_expect_1(
-//         "Optionally (hierarchical);",
-//         "Optionally \\(hierarchical\\);",
-//     );
-// }
+#[test]
+fn escapes_parentheses_in_text() {
+    transform_expect_1(
+        "Optionally (hierarchical);",
+        "Optionally \\(hierarchical\\);",
+    );
+}
 
-// #[test]
-// fn escapes_trailing_period_in_line() {
-//     transform_expect_1("the past.\n", "the past\\.");
-// }
+#[test]
+fn escapes_trailing_period_in_line() {
+    transform_expect_1("the past.\n", "the past\\.");
+}
 
-// #[test]
-// fn converts_bold_and_italics() {
-//     transform_expect_1(
-//         "into a **multi‑step compressor** and *never* feeding",
-//         "into a *multi‑step compressor* and _never_ feeding",
-//     );
-// }
+#[test]
+fn converts_bold_and_italics() {
+    transform_expect_1(
+        "into a **multi‑step compressor** and *never* feeding",
+        "into a *multi‑step compressor* and _never_ feeding",
+    );
+}
 
 // #[test]
 // fn converts_heading_to_star_heading() {

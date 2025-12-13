@@ -20,9 +20,9 @@ pub struct Converter {
     quote_level: u8,
     link: Option<Link>,
     new_line: bool,
-
+    prefix: String,
     // use for operations on temporary strings to avoid allocations
-    buffer: String,
+    // buffer: String,
 }
 
 #[derive(Debug)]
@@ -53,8 +53,7 @@ impl Default for Converter {
             quote_level: 0,
             link: None,
             new_line: true,
-
-            buffer: String::new(),
+            prefix: String::new(),
         }
     }
 }
@@ -83,11 +82,69 @@ impl Converter {
     }
 
     fn text(&mut self, txt: &str) {
-        let prefix = self.build_prefix();
         let last = self.result.last_mut().unwrap();
-        last.push_str(&prefix);
+        last.push_str(&std::mem::take(&mut self.prefix));
         last.push_str(txt);
         self.new_line = false;
+    }
+
+    fn prefix(&mut self, desc: Descriptor) {
+        match desc {
+            Descriptor::ListItem => {
+                let depth = self
+                    .stack
+                    .iter()
+                    .filter(|d| matches!(d, Descriptor::List { .. }))
+                    .count();
+
+                // Two spaces per nesting level (skip the first level).
+                if depth > 1 {
+                    for _ in 0..((depth - 1) * 2) {
+                        self.prefix.push(' ');
+                    }
+                }
+                let index = self.stack.iter_mut().rev().find_map(|d| match d {
+                    Descriptor::List {
+                        ordered: true,
+                        index,
+                    } => Some(index),
+                    _ => None,
+                });
+                if let Some(index) = index {
+                    self.prefix.push_str(&format!("{}\\. ", index));
+                    *index += 1;
+                } else {
+                    self.prefix.push_str("⦁ ");
+                }
+            }
+            Descriptor::List { .. } => {}
+            Descriptor::CodeBlock { .. } => {
+                self.prefix.push_str("```\n");
+            }
+            Descriptor::Code => {
+                self.prefix.push_str("`");
+            }
+            Descriptor::Heading(level) => {
+                let marker = match level {
+                    1 => "*🌟 ",
+                    2 => "*⭐ ",
+                    3 => "*✨ ",
+                    4 => "*🔸 ",
+                    5 => "_🔹 ",
+                    _ => "_✴️ ",
+                };
+                self.prefix.push_str(marker);
+            }
+            Descriptor::Emphasis => {
+                self.prefix.push_str("_");
+            }
+            Descriptor::Strong => {
+                self.prefix.push_str("*");
+            }
+            Descriptor::Strikethrough => {
+                self.prefix.push_str("~");
+            }
+        }
     }
 
     fn postfix(&mut self, desc: Descriptor) {
@@ -102,10 +159,18 @@ impl Converter {
                 last.push_str("`");
             }
             Descriptor::Heading(level) => {
-                last.push_str("\n");
+                let marker = match level {
+                    1 => "*",
+                    2 => "*",
+                    3 => "*",
+                    4 => "*",
+                    5 => "_",
+                    _ => "_",
+                };
+                last.push_str(marker);
             }
             Descriptor::Emphasis => {
-                last.push_str("*");
+                last.push_str("_");
             }
             Descriptor::Strong => {
                 last.push_str("*");
@@ -116,43 +181,9 @@ impl Converter {
         }
     }
 
-    fn build_prefix(&mut self) -> String {
-        if !self.new_line {
-            return String::new();
-        }
-
-        // Clear reusable buffer that will hold the suffix.
-        self.buffer.clear();
-
-        // Render list indentation + bullet when we are inside a list item
-        if self.stack.iter().any(|d| matches!(d, Descriptor::ListItem)) {
-            // Depth = number of lists currently on the stack.
-            let depth = self
-                .stack
-                .iter()
-                .filter(|d| matches!(d, Descriptor::List { .. }))
-                .count();
-
-            // Two spaces per nesting level (skip the first level).
-            if depth > 1 {
-                for _ in 0..((depth - 1) * 2) {
-                    self.buffer.push(' ');
-                }
-            }
-            let index = self.stack.iter_mut().rev().find_map(|d| match d {
-                Descriptor::List {
-                    ordered: true,
-                    index,
-                } => Some(index),
-                _ => None,
-            });
-            if let Some(index) = index {
-                self.buffer.push_str(&format!("{}\\. ", index));
-                *index += 1;
-            } else {
-                self.buffer.push_str("⦁ ");
-            }
-        }
+    #[allow(dead_code)]
+    fn new_prefix(&mut self) -> String {
+        let mut prefix = String::new();
 
         // Build prefix and suffix for inline formatting. We open from outermost to
         // innermost, and close in reverse order by accumulating into `self.buffer`.
@@ -160,40 +191,40 @@ impl Converter {
             match desc {
                 Descriptor::Heading(level) => {
                     let marker = match level {
-                        1 => "*🌟 ",
-                        2 => "*⭐ ",
-                        3 => "*✨ ",
-                        4 => "*🔸 ",
-                        5 => "_🔹 ",
-                        _ => "_✴️ ",
+                        1 => "*",
+                        2 => "*",
+                        3 => "*",
+                        4 => "*",
+                        5 => "_",
+                        _ => "_",
                     };
-                    self.buffer.push_str(marker);
+                    prefix.push_str(marker);
                 }
                 Descriptor::CodeBlock(lang) => {
                     let lang = escape_text(lang);
-                    self.buffer.push_str("```");
-                    self.buffer.push_str(&lang);
-                    self.buffer.push('\n');
+                    prefix.push_str("```");
+                    prefix.push_str(&lang);
+                    prefix.push('\n');
                 }
                 Descriptor::Strong => {
-                    self.buffer.push_str("*");
+                    prefix.push_str("*");
                 }
                 Descriptor::Emphasis => {
-                    self.buffer.push('_');
+                    prefix.push('_');
                 }
                 Descriptor::Strikethrough => {
-                    self.buffer.push('~');
+                    prefix.push('~');
                 }
                 Descriptor::Code => {
-                    self.buffer.push('`');
+                    prefix.push('`');
                 }
                 Descriptor::List { .. } | Descriptor::ListItem => {
-                    // Already handled indentation/bullet above.
+                    // Not needed
                 }
             }
         }
 
-        return std::mem::take(&mut self.buffer);
+        return prefix;
     }
 
     /// Convert Markdown into Telegram MarkdownV2 and split into safe chunks.
@@ -231,6 +262,7 @@ impl Converter {
                     self.stack.push(Descriptor::Code);
                     self.text(&escape_text(&txt));
                     self.stack.pop();
+                    self.postfix(Descriptor::Code);
 
                     println!("Code");
                 }
@@ -315,7 +347,9 @@ impl Converter {
                     HeadingLevel::H5 => 5,
                     HeadingLevel::H6 => 6,
                 };
-                self.stack.push(Descriptor::Heading(level));
+                let desc = Descriptor::Heading(level);
+                self.stack.push(desc.clone());
+                self.prefix(desc);
 
                 println!("Heading");
             }
@@ -329,7 +363,9 @@ impl Converter {
                     CodeBlockKind::Fenced(lang) => lang.to_string(),
                     CodeBlockKind::Indented => String::new(),
                 };
-                self.stack.push(Descriptor::CodeBlock(lang));
+                let desc = Descriptor::CodeBlock(lang);
+                self.stack.push(desc.clone());
+                self.prefix(desc);
 
                 println!("CodeBlock");
             }
@@ -347,6 +383,7 @@ impl Converter {
             }
             Tag::Item => {
                 self.stack.push(Descriptor::ListItem);
+                self.prefix(Descriptor::ListItem);
 
                 println!("Item");
             }
@@ -373,16 +410,19 @@ impl Converter {
             }
             Tag::Emphasis => {
                 self.stack.push(Descriptor::Emphasis);
+                self.prefix(Descriptor::Emphasis);
 
                 println!("Emphasis");
             }
             Tag::Strong => {
                 self.stack.push(Descriptor::Strong);
+                self.prefix(Descriptor::Strong);
 
                 println!("Strong");
             }
             Tag::Strikethrough => {
                 self.stack.push(Descriptor::Strikethrough);
+                self.prefix(Descriptor::Strikethrough);
 
                 println!("Strikethrough");
             }
