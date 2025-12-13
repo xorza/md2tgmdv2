@@ -3,82 +3,43 @@
 //! Public entry point is [`transform`]. It renders Markdown into Telegram‑safe
 //! MarkdownV2 and splits the result into chunks that fit the provided limit.
 
+#![allow(unused_imports)]
+
 use anyhow::anyhow;
 use pulldown_cmark::{CodeBlockKind, Event, HeadingLevel, Options, Parser, Tag, TagEnd};
+use std::{hash::BuildHasher, ops::Range};
 
 /// Telegram MarkdownV2 message hard limit.
 pub const TELEGRAM_BOT_MAX_MESSAGE_LENGTH: usize = 4096;
-const DEBUG_LOG: bool = false;
-
-macro_rules! debug_log {
-    ($($arg:tt)*) => {
-        if DEBUG_LOG {
-            println!($($arg)*);
-        }
-    };
-}
 
 #[derive(Debug)]
 pub struct Converter {
     max_len: usize,
     result: Vec<String>,
     stack: Vec<Descriptor>,
-    add_new_line: bool,
-    after_heading: bool,
     quote_level: u8,
-    list_stack: Vec<ListState>,
-    carry_list_indent_levels: usize,
-    after_list_prefix: bool,
-    last_list_prefix: String,
-    list_body_written: bool,
-    heading_body_written: bool,
-    link_dest_url: String,
-    // Depth counter for temporarily skipping events (used for image alt text).
-    skip_depth: u16,
+    link: Option<Link>,
+
+    // use for operations on temporary strings to avoid allocations
+    buffer: String,
 }
 
-/// Small helper used to budget space in the current chunk before emitting new
-/// content. `lead` is any text that must be written before the body (e.g.,
-/// openers or list prefixes), `tail` is space we must reserve for a trailing
-/// closer, and `min_body` is the smallest body we intend to keep with the
-/// opener/prefix to avoid dangling markers.
-#[derive(Clone, Copy)]
-struct SpaceBudget {
-    lead: usize,
-    tail: usize,
-    min_body: usize,
-    skip_top: bool,
+#[derive(Debug)]
+pub struct Link {
+    url: String,
+    title: String,
 }
 
-impl SpaceBudget {
-    fn for_open(opener_len: usize, closer_len: usize, min_body: usize) -> Self {
-        Self {
-            lead: opener_len,
-            tail: closer_len,
-            min_body,
-            skip_top: false,
-        }
-    }
-
-    fn for_prefix(prefix_len: usize, min_body: usize) -> Self {
-        Self {
-            lead: prefix_len,
-            tail: 0,
-            min_body,
-            skip_top: false,
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum Descriptor {
     Strong,
     Emphasis,
-    #[allow(dead_code)]
     CodeBlock(String),
     Strikethrough,
     Code,
-    Heading(HeadingLevel),
+    List { ordered: bool, index: u32 },
+    Heading(u8),
+    ListItem,
 }
 
 impl Default for Converter {
@@ -86,18 +47,12 @@ impl Default for Converter {
         Self {
             max_len: TELEGRAM_BOT_MAX_MESSAGE_LENGTH,
             result: vec![],
+
             stack: Vec::new(),
-            add_new_line: false,
-            after_heading: false,
             quote_level: 0,
-            list_stack: Vec::new(),
-            carry_list_indent_levels: 0,
-            after_list_prefix: false,
-            last_list_prefix: String::new(),
-            list_body_written: false,
-            heading_body_written: false,
-            link_dest_url: String::new(),
-            skip_depth: 0,
+            link: None,
+
+            buffer: String::new(),
         }
     }
 }
@@ -108,6 +63,106 @@ impl Converter {
             max_len,
             ..Default::default()
         }
+    }
+
+    fn new_line(&mut self) {
+        let last = self.result.last_mut().unwrap();
+        last.push_str("\n");
+        if self.quote_level > 0 {
+            last.push_str(&">".repeat(self.quote_level as usize));
+        }
+    }
+
+    fn url(&mut self, txt: &str, url: &str) {
+        let txt = escape_text(txt);
+        let url = escape_text(url);
+        self.text(&format!("[{}]({})", txt, url));
+    }
+
+    fn text(&mut self, txt: &str) {
+        self.build_prefix();
+
+        let last = self.result.last_mut().unwrap();
+        last.push_str(txt);
+        // Suffix collected in `self.buffer` inside `build_prefix`.
+        last.push_str(&self.buffer);
+        self.buffer.clear();
+    }
+
+    fn build_prefix(&mut self) -> String {
+        // Clear reusable buffer that will hold the suffix.
+        self.buffer.clear();
+
+        // Render list indentation + bullet when we are inside a list item
+        if self.stack.iter().any(|d| matches!(d, Descriptor::ListItem)) {
+            // Depth = number of lists currently on the stack.
+            let depth = self
+                .stack
+                .iter()
+                .filter(|d| matches!(d, Descriptor::List { .. }))
+                .count();
+
+            // Two spaces per nesting level (skip the first level).
+            if depth > 1 {
+                for _ in 0..((depth - 1) * 2) {
+                    self.buffer.push(' ');
+                }
+            }
+            let index = self.stack.iter_mut().rev().find_map(|d| match d {
+                Descriptor::List {
+                    ordered: true,
+                    index,
+                } => Some(index),
+                _ => None,
+            });
+            if let Some(index) = index {
+                self.buffer.push_str(&format!("{}\\. ", index));
+                *index += 1;
+            } else {
+                self.buffer.push_str("⦁ ");
+            }
+        }
+
+        // Build prefix and suffix for inline formatting. We open from outermost to
+        // innermost, and close in reverse order by accumulating into `self.buffer`.
+        for desc in self.stack.iter() {
+            match desc {
+                Descriptor::Heading(level) => {
+                    let marker = match level {
+                        1 => "**🌟 ",
+                        2 => "**⭐ ",
+                        3 => "**✨ ",
+                        4 => "**🔸 ",
+                        5 => "__🔹 ",
+                        _ => "__✴️ ",
+                    };
+                    self.buffer.push_str(marker);
+                }
+                Descriptor::CodeBlock(lang) => {
+                    let lang = escape_text(lang);
+                    self.buffer.push_str("```");
+                    self.buffer.push_str(&lang);
+                    self.buffer.push('\n');
+                }
+                Descriptor::Strong => {
+                    self.buffer.push_str("**");
+                }
+                Descriptor::Emphasis => {
+                    self.buffer.push('_');
+                }
+                Descriptor::Strikethrough => {
+                    self.buffer.push('~');
+                }
+                Descriptor::Code => {
+                    self.buffer.push('`');
+                }
+                Descriptor::List { .. } | Descriptor::ListItem => {
+                    // Already handled indentation/bullet above.
+                }
+            }
+        }
+
+        return std::mem::take(&mut self.buffer);
     }
 
     /// Convert Markdown into Telegram MarkdownV2 and split into safe chunks.
@@ -123,15 +178,6 @@ impl Converter {
 
         let parser = Parser::new_ext(markdown, Options::ENABLE_STRIKETHROUGH);
         for event in parser {
-            if self.skip_depth > 0 {
-                // When skipping (e.g., image alt text), keep depth balanced.
-                match &event {
-                    Event::Start(_) => self.skip_depth += 1,
-                    Event::End(_) => self.skip_depth -= 1,
-                    _ => {}
-                }
-                continue;
-            }
             match event {
                 Event::Start(tag) => {
                     self.start_tag(tag)?;
@@ -140,83 +186,74 @@ impl Converter {
                     self.end_tag(tag)?;
                 }
                 Event::Text(txt) => {
-                    if self.link_dest_url.is_empty() {
-                        self.output(&txt, true);
-                    } else {
-                        let mut link = String::new();
-                        link.push('[');
-                        push_escaped(&mut link, &txt);
-                        link.push_str("](");
-                        push_escaped(&mut link, &self.link_dest_url);
-                        link.push(')');
-                        self.write(&link, false, false, false);
-
-                        self.link_dest_url.clear();
+                    let txt = escape_text(&txt);
+                    match self.link.as_mut() {
+                        Some(link) => {
+                            link.title.push_str(&txt);
+                        }
+                        None => self.text(&txt),
                     }
 
-                    debug_log!("Text {}", txt);
+                    println!("Text {}", txt);
                 }
                 Event::Code(txt) => {
-                    self.ensure_space(SpaceBudget::for_open(1, 1, 1));
                     self.stack.push(Descriptor::Code);
-                    self.output("`", false);
-                    self.output(&txt, true);
-                    self.output_closing("`", false);
-                    self.close_descriptor(Descriptor::Code)?;
+                    self.text(&escape_text(&txt));
+                    self.stack.pop();
 
-                    debug_log!("Code");
+                    println!("Code");
                 }
                 Event::InlineMath(txt) => {
-                    self.output(&txt, true);
+                    self.text(&escape_text(&txt));
 
-                    debug_log!("InlineMath");
+                    println!("InlineMath");
                 }
                 Event::DisplayMath(txt) => {
-                    self.output(&txt, true);
+                    self.text(&escape_text(&txt));
 
-                    debug_log!("DisplayMath");
+                    println!("DisplayMath");
                 }
                 Event::Html(txt) => {
-                    self.output(&txt, true);
+                    self.text(&escape_text(&txt));
 
-                    debug_log!("Html");
+                    println!("Html");
                 }
                 Event::InlineHtml(txt) => {
-                    self.output(&txt, true);
+                    self.text(&escape_text(&txt));
 
-                    debug_log!("InlineHtml");
+                    println!("InlineHtml");
                 }
                 Event::FootnoteReference(txt) => {
-                    self.output(&txt, true);
+                    self.text(&escape_text(&txt));
 
-                    debug_log!("FootnoteReference");
+                    println!("FootnoteReference");
                 }
                 Event::SoftBreak => {
-                    self.add_new_line = true;
+                    self.new_line();
 
-                    debug_log!("SoftBreak");
+                    println!("SoftBreak");
                 }
                 Event::HardBreak => {
-                    self.add_new_line = true;
+                    self.new_line();
 
-                    debug_log!("HardBreak");
+                    println!("HardBreak");
                 }
                 Event::Rule => {
                     self.new_line();
-                    self.output("————————", true);
-                    self.add_new_line = true;
+                    self.text("———");
+                    self.new_line();
+                    self.new_line();
 
-                    debug_log!("Rule");
+                    println!("Rule");
                 }
                 Event::TaskListMarker(b) => {
-                    self.new_line();
                     if b {
-                        self.output("☑️", false);
+                        self.text("☑️");
                     } else {
-                        self.output("☐", false);
+                        self.text("☐");
                     }
 
-                    debug_log!("TaskListMarker({})", b);
+                    println!("TaskListMarker({})", b);
                 }
             }
         }
@@ -225,512 +262,135 @@ impl Converter {
             return Err(anyhow!("Unbalanced tags"));
         }
 
-        for (idx, chunk) in self.result.iter().enumerate() {
-            if chunk.len() > self.max_len {
-                return Err(anyhow!(
-                    "internal parser error: chunk {} exceeds max_len ({} > {})",
-                    idx,
-                    chunk.len(),
-                    self.max_len
-                ));
-            }
+        for chunk in &mut self.result {
+            let trimmed_len = chunk.trim_end().len();
+            chunk.truncate(trimmed_len);
         }
 
         Ok(std::mem::take(&mut self.result))
     }
 
-    /// Ensure the current chunk can fit the requested budget. If not, split
-    /// before emitting the next content to avoid dangling markers or prefixes.
-    fn ensure_space(&mut self, budget: SpaceBudget) {
-        if self.result.last().map(|s| s.is_empty()).unwrap_or(true) {
-            return;
-        }
-        let available = self.available_space(budget.skip_top);
-        let needed = budget.lead + budget.min_body + budget.tail;
-        if available < needed {
-            self.split_chunk();
-        }
-    }
-
-    /// Compute remaining writable space in the current chunk after accounting
-    /// for any pending prefixes (newline/quotes) and the closers of the open
-    /// descriptors. When `skip_top` is true we ignore the closer of the topmost
-    /// descriptor (used while writing that closer itself).
-    fn available_space(&self, skip_top: bool) -> usize {
-        let current_len = self.result.last().map(|s| s.len()).unwrap_or(0);
-        let reserved = self.pending_prefix_len() + self.closers_len(skip_top);
-        self.max_len.saturating_sub(current_len + reserved)
-    }
-
-    fn new_line(&mut self) {
-        // Any newline ends the "after prefix" state to avoid suppressing later breaks.
-        self.after_list_prefix = false;
-        let last_len = self.result.last().map(|s| s.len()).unwrap_or(0);
-        if last_len == 0 {
-            return;
-        }
-        let needed = 1 + self.quote_level as usize;
-        if last_len + needed > self.max_len {
-            // Start a fresh chunk instead of emitting an empty newline-only tail.
-            self.split_chunk();
-            return;
-        }
-
-        let last = self.result.last_mut().unwrap();
-        last.push('\n');
-        if self.quote_level > 0 {
-            last.push_str(&">".repeat(self.quote_level as usize));
-        }
-    }
-    fn output(&mut self, txt: &str, escape: bool) {
-        self.write(txt, escape, true, false);
-    }
-
-    /// Write a closing marker for the currently open top descriptor.
-    /// This skips reserving space for that descriptor's own closer,
-    /// so we don't over-reserve and force an unnecessary split.
-    fn output_closing(&mut self, txt: &str, escape: bool) {
-        self.write(txt, escape, true, true);
-    }
-
-    /// Core write function. `breakable` toggles word-boundary splitting.
-    /// `skip_top` omits the top descriptor when reserving closer space.
-    fn write(&mut self, txt: &str, escape: bool, breakable: bool, skip_top: bool) {
-        let owned: Option<String> = if escape { Some(escape_str(txt)) } else { None };
-        let mut remaining: &str = owned.as_deref().unwrap_or(txt);
-
-        while !remaining.is_empty() {
-            // Make sure pending prefixes and closers still fit.
-            let current_len = self.result.last().map(|s| s.len()).unwrap_or(0);
-            let available = self.available_space(skip_top);
-            if available == 0 {
-                self.split_chunk();
-                continue;
-            }
-
-            let take = if breakable {
-                let allow_hard_split = current_len == 0;
-                let sp = split_point(remaining, available, allow_hard_split);
-                if sp == 0 {
-                    // No whitespace before limit. If there is existing content, start a new chunk
-                    // so we don't split mid-word. Otherwise, force a split (single very long word).
-                    if current_len > 0 {
-                        self.split_chunk();
-                        continue;
-                    }
-                    available
-                } else {
-                    sp
-                }
-            } else if remaining.len() > available && remaining.len() <= self.max_len {
-                // Keep unbreakable text together if it can fit a fresh chunk.
-                self.split_chunk();
-                continue;
-            } else {
-                remaining.len().min(available)
-            };
-
-            if take == 0 {
-                self.split_chunk();
-                continue;
-            }
-
-            self.flush_pending_prefix();
-            let (part, rest) = remaining.split_at(take);
-
-            // Trim whitespace that would straddle the split for breakable text.
-            let (part, rest) = if breakable && !rest.is_empty() {
-                let soft_ws = |c: char| c == ' ' || c == '\t';
-                (
-                    part.trim_end_matches(soft_ws),
-                    rest.trim_start_matches(soft_ws),
-                )
-            } else {
-                (part, rest)
-            };
-
-            if !part.is_empty() {
-                let last = self.result.last_mut().unwrap();
-                last.push_str(part);
-                if self.after_list_prefix {
-                    self.list_body_written = true;
-                }
-            }
-
-            remaining = rest;
-
-            if !remaining.is_empty() {
-                self.split_chunk();
-            }
-        }
-    }
-
-    /// Number of prefix characters that would be inserted before the next write.
-    fn pending_prefix_len(&self) -> usize {
-        let mut len = 0;
-        if self.add_new_line {
-            len += 1; // the newline itself
-            if self.quote_level > 0 {
-                len += self.quote_level as usize;
-            }
-        } else if self.result.last().map(|s| s.is_empty()).unwrap_or(true) && self.quote_level > 0 {
-            len += self.quote_level as usize;
-        }
-
-        len
-    }
-
-    /// Emit any pending newline and quote prefix.
-    fn flush_pending_prefix(&mut self) {
-        let last = self.result.last_mut().unwrap();
-        if self.add_new_line {
-            last.push('\n');
-            if self.quote_level > 0 {
-                last.push_str(&">".repeat(self.quote_level as usize));
-            }
-            self.add_new_line = false;
-        } else if last.is_empty() && self.quote_level > 0 {
-            last.push_str(&">".repeat(self.quote_level as usize));
-        }
-    }
-
-    fn split_chunk(&mut self) {
-        let heading_pending =
-            !self.heading_body_written && matches!(self.stack.last(), Some(Descriptor::Heading(_)));
-        if !heading_pending {
-            self.trim_trailing_ws();
-        }
-
-        let (carry_list_prefix, carry_list_prefix_newline) = self.take_dangling_list_prefix();
-        let carried_heading = self.take_dangling_heading();
-
-        // When carrying a heading, temporarily pop so we don't write its closer here.
-        if carried_heading.is_some() {
-            self.stack.pop();
-        }
-
-        self.write_closers();
-
-        // Restore carried heading to the stack for reopening.
-        if let Some(ref h) = carried_heading {
-            self.stack.push(h.clone());
-        }
-        self.result.push(String::new());
-        self.add_new_line = carry_list_prefix_newline;
-        self.reopen_descriptors();
-        if let Some(prefix) = carry_list_prefix {
-            // Re-emit quote prefix if needed.
-            self.flush_pending_prefix();
-            let chunk_idx = self.result.len() - 1;
-            self.result[chunk_idx].push_str(&prefix);
-            self.after_list_prefix = true;
-            self.list_body_written = false;
-        }
-    }
-
-    /// Trim trailing spaces and tabs from the current chunk.
-    fn trim_trailing_ws(&mut self) {
-        if let Some(last) = self.result.last_mut() {
-            while last.ends_with(' ') || last.ends_with('\t') {
-                last.pop();
-            }
-        }
-    }
-
-    /// If the current chunk ends with a list prefix that has no body yet,
-    /// remove and carry it over to the next chunk so markers never dangle.
-    fn take_dangling_list_prefix(&mut self) -> (Option<String>, bool) {
-        if self.after_list_prefix && !self.list_body_written {
-            let prefix = self.last_list_prefix.clone();
-            let mut carry_newline = false;
-            if let Some(last) = self.result.last_mut() {
-                let len = last.len();
-                if len >= prefix.len() {
-                    last.truncate(len - prefix.len());
-                }
-                while last.ends_with('\n') || last.ends_with('\r') {
-                    last.pop();
-                    carry_newline = true;
-                }
-            }
-            (Some(prefix), carry_newline)
-        } else {
-            (None, false)
-        }
-    }
-
-    /// Carry an unfinished heading opener into the next chunk to avoid splitting
-    /// immediately after the marker.
-    fn take_dangling_heading(&mut self) -> Option<Descriptor> {
-        if self.heading_body_written {
-            return None;
-        }
-        if let Some(Descriptor::Heading(level)) = self.stack.last() {
-            let opener = heading_prefix(*level);
-            if let Some(last) = self.result.last_mut() {
-                if last.ends_with(opener) {
-                    last.truncate(last.len() - opener.len());
-                    return Some(Descriptor::Heading(*level));
-                }
-            }
-        }
-        None
-    }
-
-    fn write_closers(&mut self) {
-        if self.stack.is_empty() {
-            return;
-        }
-        let closers: Vec<&str> = self.stack.iter().rev().map(descriptor_closer).collect();
-        let last = self.result.last_mut().unwrap();
-        for closer in closers {
-            last.push_str(closer);
-        }
-    }
-
-    fn reopen_descriptors(&mut self) {
-        if self.stack.is_empty() {
-            return;
-        }
-        // Clone to avoid holding an immutable borrow while writing.
-        let descriptors = self.stack.clone();
-        for desc in descriptors {
-            match desc {
-                Descriptor::Strong => self.output("*", false),
-                Descriptor::Emphasis => self.output("_", false),
-                Descriptor::Strikethrough => self.output("~~", false),
-                Descriptor::Code => self.output("`", false),
-                Descriptor::Heading(level) => self.output(heading_prefix(level), false),
-                Descriptor::CodeBlock(lang) => {
-                    self.output("```", false);
-                    self.output(&lang, true);
-                    self.add_new_line = true;
-                }
-            }
-        }
-    }
-
-    fn closers_len(&self, skip_top: bool) -> usize {
-        let mut iter = self.stack.iter().rev();
-        if skip_top {
-            iter.next();
-        }
-        iter.map(descriptor_closer).map(str::len).sum()
-    }
-
-    fn list_prefix(&mut self) -> String {
-        let base_levels = self.list_stack.len().saturating_sub(1);
-        let extra_levels = self.list_stack.last().map(|s| s.extra_levels).unwrap_or(0);
-        let indent_len = (base_levels + extra_levels) * 2;
-        let indent = " ".repeat(indent_len);
-        if let Some(state) = self.list_stack.last_mut() {
-            if state.ordered {
-                let number = state.start + state.items as u64;
-                return format!("{}{}\\. ", indent, number);
-            }
-        }
-        format!("{}⦁ ", indent)
-    }
-
     fn start_tag(&mut self, tag: Tag) -> anyhow::Result<()> {
-        // Reset carry indent when encountering non-list content.
-        match tag {
-            Tag::List(_) => {}
-            _ => self.carry_list_indent_levels = 0,
-        }
         match tag {
             Tag::Paragraph => {
-                if self.after_list_prefix {
-                    // Continue on the same line after a list marker.
-                    self.after_list_prefix = false;
-                    self.after_heading = false;
-                } else if self.after_heading {
-                    self.new_line();
-                    self.after_heading = false;
-                } else {
-                    self.new_line();
-                }
-
-                debug_log!("Paragraph");
+                println!("Paragraph");
             }
             Tag::Heading { level, .. } => {
-                self.ensure_space(SpaceBudget::for_open(
-                    heading_prefix(level).len(),
-                    heading_closer(level).len(),
-                    1,
-                ));
-
-                self.new_line();
-                self.output(heading_prefix(level), false);
+                let level = match level {
+                    HeadingLevel::H1 => 1,
+                    HeadingLevel::H2 => 2,
+                    HeadingLevel::H3 => 3,
+                    HeadingLevel::H4 => 4,
+                    HeadingLevel::H5 => 5,
+                    HeadingLevel::H6 => 6,
+                };
                 self.stack.push(Descriptor::Heading(level));
-                self.heading_body_written = false;
+                //self.prefix("*🌟 "),
+                // self.prefix("*⭐ "),
+                // self.prefix("*✨ "),
+                // self.prefix("*🔸 "),
+                // self.prefix("_🔹 "),
+                // self.prefix("_✴️ "),
 
-                debug_log!("Heading");
+                println!("Heading");
             }
             Tag::BlockQuote(_) => {
-                // If a blank line was pending, flush it before entering the blockquote
-                // so the empty line stays outside the quoted area.
-                if self.add_new_line {
-                    self.flush_pending_prefix();
-                }
                 self.quote_level += 1;
 
-                debug_log!("BlockQuote");
+                println!("BlockQuote");
             }
             Tag::CodeBlock(kind) => {
                 let lang = match kind {
                     CodeBlockKind::Fenced(lang) => lang.to_string(),
                     CodeBlockKind::Indented => String::new(),
                 };
-
-                // If we're close to the chunk boundary, start the code block
-                // on a fresh chunk so we don't end up force‑splitting the first
-                // line of code mid‑word. Reserve space for the opening fence,
-                // closing fence, and a little body headroom.
-                const MIN_CODE_BODY_HEADROOM: usize = 4;
-                let header_len = 3 + lang.len(); // "```" + lang
-                self.ensure_space(SpaceBudget::for_open(header_len, 3, MIN_CODE_BODY_HEADROOM));
-
-                self.output("```", false);
-                self.output(&lang, true);
-                self.add_new_line = true;
                 self.stack.push(Descriptor::CodeBlock(lang));
 
-                debug_log!("CodeBlock");
+                println!("CodeBlock");
             }
             Tag::HtmlBlock => {
-                debug_log!("HtmlBlock");
+                println!("HtmlBlock");
             }
-            Tag::List(n) => {
-                let extra_levels = if self.list_stack.is_empty() {
-                    self.carry_list_indent_levels
-                } else {
-                    0
+            Tag::List(list) => {
+                let desc = Descriptor::List {
+                    ordered: list.is_some(),
+                    index: list.unwrap_or(1) as u32,
                 };
-                self.list_stack.push(ListState::new(n, extra_levels));
-                self.carry_list_indent_levels = 0;
+                self.stack.push(desc);
 
-                debug_log!("List");
+                println!("List");
             }
             Tag::Item => {
-                let has_extra_indent = self
-                    .list_stack
-                    .last()
-                    .map(|s| s.extra_levels > 0)
-                    .unwrap_or(false);
-                if self.add_new_line
-                    && (self.list_stack.len() > 1
-                        || self.carry_list_indent_levels > 0
-                        || has_extra_indent)
-                {
-                    // When starting a nested list item right after text, consume
-                    // the pending newline instead of emitting an extra blank line.
-                    self.flush_pending_prefix();
-                    self.add_new_line = false;
-                } else {
-                    self.new_line();
-                    self.add_new_line = false;
-                }
-                let prefix = self.list_prefix();
-                // Avoid leaving the prefix at the end of the chunk with no body.
-                self.ensure_space(SpaceBudget::for_prefix(prefix.len(), 1));
-                // Ensure the prefix fits; if not, split first.
-                let pending_prefix = self.pending_prefix_len();
-                let closers_len = self.closers_len(false);
-                let current_len = self.result.last().map(|s| s.len()).unwrap_or(0);
-                if current_len + pending_prefix + closers_len + prefix.len() >= self.max_len {
-                    self.split_chunk();
-                }
-                self.flush_pending_prefix();
-                let chunk_idx = self.result.len() - 1;
-                self.result[chunk_idx].push_str(&prefix);
-                self.last_list_prefix = prefix.clone();
-                self.list_body_written = false;
+                // self.prefix("⦁ ");
+                self.stack.push(Descriptor::ListItem);
 
-                if let Some(state) = self.list_stack.last_mut() {
-                    if state.ordered {
-                        // track count to decide on follow-up indentation heuristics
-                        state.items += 1;
-                    }
-                }
-                self.after_list_prefix = true;
-
-                debug_log!("Item");
+                println!("Item");
             }
             Tag::FootnoteDefinition(_) => {
-                debug_log!("FootnoteDefinition");
+                println!("FootnoteDefinition");
             }
             Tag::Table(_) => {
-                debug_log!("Table");
+                println!("Table");
             }
             Tag::TableHead => {
-                debug_log!("TableHead");
+                println!("TableHead");
             }
             Tag::TableRow => {
-                debug_log!("TableRow");
+                println!("TableRow");
             }
             Tag::TableCell => {
-                debug_log!("TableCell");
+                println!("TableCell");
             }
             Tag::Subscript => {
-                debug_log!("Subscript");
+                println!("Subscript");
             }
             Tag::Superscript => {
-                debug_log!("Superscript");
+                println!("Superscript");
             }
             Tag::Emphasis => {
-                self.ensure_space(SpaceBudget::for_open(1, 1, 1));
-                self.output("_", false);
                 self.stack.push(Descriptor::Emphasis);
 
-                debug_log!("Emphasis");
+                println!("Emphasis");
             }
             Tag::Strong => {
-                self.ensure_space(SpaceBudget::for_open(1, 1, 1));
-                self.output("*", false);
                 self.stack.push(Descriptor::Strong);
 
-                debug_log!("Strong");
+                println!("Strong");
             }
             Tag::Strikethrough => {
-                self.ensure_space(SpaceBudget::for_open(2, 2, 1));
-                self.output("~~", false);
                 self.stack.push(Descriptor::Strikethrough);
 
-                debug_log!("Strikethrough");
+                println!("Strikethrough");
             }
             Tag::Link { dest_url, .. } => {
-                assert!(self.link_dest_url.is_empty());
+                assert!(self.link.is_none());
+                self.link = Some(Link {
+                    url: dest_url.to_string(),
+                    title: String::new(),
+                });
 
-                self.link_dest_url = dest_url.to_string();
-
-                debug_log!("Link");
+                println!("Link");
             }
             Tag::Image { dest_url, .. } => {
-                // Render images as a simple link placeholder: [Image](url)
-                let mut link = String::new();
-                link.push_str("[Image](");
-                push_escaped(&mut link, &dest_url);
-                link.push(')');
-                self.write(&link, false, false, false);
+                assert!(self.link.is_none());
+                self.link = Some(Link {
+                    url: dest_url.to_string(),
+                    title: String::new(),
+                });
 
-                // Skip any nested alt-text events until the matching end tag to
-                // avoid emitting the alt content (Telegram won't render it).
-                self.skip_depth = 1;
-
-                debug_log!("Image");
+                println!("Image");
             }
             Tag::MetadataBlock(_) => {
-                debug_log!("MetadataBlock");
+                println!("MetadataBlock");
             }
             Tag::DefinitionList => {
-                debug_log!("DefinitionList");
+                println!("DefinitionList");
             }
             Tag::DefinitionListTitle => {
-                debug_log!("DefinitionListTitle");
+                println!("DefinitionListTitle");
             }
             Tag::DefinitionListDefinition => {
-                debug_log!("DefinitionListDefinition");
+                println!("DefinitionListDefinition");
             }
         }
 
@@ -740,174 +400,136 @@ impl Converter {
     fn end_tag(&mut self, tag: TagEnd) -> anyhow::Result<()> {
         match tag {
             TagEnd::Paragraph => {
-                self.add_new_line = true;
+                self.new_line();
 
-                debug_log!("EndParagraph");
+                println!("EndParagraph");
             }
-            TagEnd::Heading(level) => {
-                self.output_closing(heading_closer(level), false);
-                self.add_new_line = false;
-                self.after_heading = true;
-                self.close_descriptor(Descriptor::Heading(level))?;
-                self.heading_body_written = false;
+            TagEnd::Heading(_) => {
+                let desc = self.stack.pop().expect("Unexpected end of list");
+                assert!(
+                    matches!(desc, Descriptor::Heading { .. }),
+                    "Unexpected end of list"
+                );
 
-                debug_log!("EndHeading");
+                println!("EndHeading");
             }
             TagEnd::BlockQuote(_) => {
-                self.add_new_line = true;
                 self.quote_level -= 1;
 
-                debug_log!("EndBlockQuote");
+                println!("EndBlockQuote");
             }
             TagEnd::CodeBlock => {
-                self.output_closing("```", false);
-                self.add_new_line = true;
-                self.close_descriptor(Descriptor::CodeBlock(String::new()))?;
+                let desc = self.stack.pop().expect("Unexpected end of list");
+                assert!(
+                    matches!(desc, Descriptor::CodeBlock { .. }),
+                    "Unexpected end of list"
+                );
 
-                debug_log!("EndCodeBlock");
+                println!("EndCodeBlock");
             }
             TagEnd::HtmlBlock => {
-                debug_log!("EndHtmlBlock");
+                println!("EndHtmlBlock");
             }
             TagEnd::List(_) => {
-                if let Some(state) = self.list_stack.pop() {
-                    // If we just closed a single-item ordered list, consider the next
-                    // top-level list as nested one level deeper (common in docs).
-                    if state.ordered && state.items == 1 && self.list_stack.is_empty() {
-                        self.carry_list_indent_levels = 1;
-                    } else if self.list_stack.is_empty() {
-                        self.carry_list_indent_levels = 0;
-                    }
-                }
-                self.add_new_line = true;
-                self.after_list_prefix = false;
+                let desc = self.stack.pop().expect("Unexpected end of list");
+                assert!(
+                    matches!(desc, Descriptor::List { .. }),
+                    "Unexpected end of list"
+                );
 
-                debug_log!("EndList");
+                println!("EndList");
             }
             TagEnd::Item => {
-                debug_log!("EndItem");
+                let desc = self.stack.pop().expect("Unexpected end of list");
+                assert!(
+                    matches!(desc, Descriptor::ListItem),
+                    "Unexpected end of list"
+                );
+
+                println!("EndItem");
             }
             TagEnd::FootnoteDefinition => {
-                debug_log!("EndFootnoteDefinition");
+                println!("EndFootnoteDefinition");
             }
             TagEnd::Table => {
-                debug_log!("EndTable");
+                println!("EndTable");
             }
             TagEnd::TableHead => {
-                debug_log!("EndTableHead");
+                println!("EndTableHead");
             }
             TagEnd::TableRow => {
-                debug_log!("EndTableRow");
+                self.new_line();
+
+                println!("EndTableRow");
             }
             TagEnd::TableCell => {
-                debug_log!("EndTableCell");
+                println!("EndTableCell");
             }
             TagEnd::Subscript => {
-                debug_log!("EndSubscript");
+                println!("EndSubscript");
             }
             TagEnd::Superscript => {
-                debug_log!("EndSuperscript");
+                println!("EndSuperscript");
             }
             TagEnd::Emphasis => {
-                self.output_closing("_", false);
-                self.close_descriptor(Descriptor::Emphasis)?;
+                let desc = self.stack.pop().expect("Unexpected end of list");
+                assert!(
+                    matches!(desc, Descriptor::Emphasis),
+                    "Unexpected end of list"
+                );
 
-                debug_log!("EndEmphasis");
+                println!("EndEmphasis");
             }
             TagEnd::Strong => {
-                self.output_closing("*", false);
-                self.close_descriptor(Descriptor::Strong)?;
+                let desc = self.stack.pop().expect("Unexpected end of list");
+                assert!(matches!(desc, Descriptor::Strong), "Unexpected end of list");
 
-                debug_log!("EndStrong");
+                println!("EndStrong");
             }
             TagEnd::Strikethrough => {
-                self.output_closing("~~", false);
-                self.close_descriptor(Descriptor::Strikethrough)?;
+                let desc = self.stack.pop().expect("Unexpected end of list");
+                assert!(
+                    matches!(desc, Descriptor::Strikethrough),
+                    "Unexpected end of list"
+                );
             }
             TagEnd::Link => {
-                debug_log!("EndLink");
+                let link = self.link.take().expect("Unexpected end of list");
+                self.url(&link.title, &link.url);
+
+                println!("EndLink");
             }
             TagEnd::Image => {
-                debug_log!("EndImage");
+                let link = self.link.take().expect("Unexpected end of list");
+                let title = if link.title.is_empty() {
+                    "Image".to_string()
+                } else {
+                    link.title.clone()
+                };
+                self.url(&title, &link.url);
+
+                println!("EndImage");
             }
             TagEnd::MetadataBlock(_) => {
-                debug_log!("EndMetadataBlock");
+                println!("EndMetadataBlock");
             }
             TagEnd::DefinitionList => {
-                debug_log!("EndDefinitionList");
+                println!("EndDefinitionList");
             }
             TagEnd::DefinitionListTitle => {
-                debug_log!("EndDefinitionListTitle");
+                println!("EndDefinitionListTitle");
             }
             TagEnd::DefinitionListDefinition => {
-                debug_log!("EndDefinitionListDefinition");
+                println!("EndDefinitionListDefinition");
             }
         }
 
         Ok(())
     }
-
-    fn close_descriptor(&mut self, descriptor: Descriptor) -> anyhow::Result<()> {
-        let last = self.stack.pop().expect("Unexpected end tag");
-        assert_eq!(last, descriptor, "Unexpected end tag");
-
-        Ok(())
-    }
 }
-
-fn split_point(text: &str, max_len: usize, allow_hard_split: bool) -> usize {
-    if text.len() <= max_len {
-        return text.len();
-    }
-
-    let mut last_space = None;
-    for (idx, ch) in text.char_indices() {
-        if idx >= max_len {
-            break;
-        }
-        if ch.is_whitespace() {
-            last_space = Some(idx + ch.len_utf8());
-        }
-    }
-
-    if let Some(sp) = last_space {
-        return sp;
-    }
-
-    if allow_hard_split { max_len } else { 0 }
-}
-
-fn descriptor_closer(desc: &Descriptor) -> &'static str {
-    match desc {
-        Descriptor::Strong => "*",
-        Descriptor::Emphasis => "_",
-        Descriptor::Strikethrough => "~~",
-        Descriptor::Code => "`",
-        Descriptor::CodeBlock(_) => "```",
-        Descriptor::Heading(level) => heading_closer(*level),
-    }
-}
-
-fn heading_prefix(level: HeadingLevel) -> &'static str {
-    match level {
-        HeadingLevel::H1 => "*🌟 ",
-        HeadingLevel::H2 => "*⭐ ",
-        HeadingLevel::H3 => "*✨ ",
-        HeadingLevel::H4 => "*🔸 ",
-        HeadingLevel::H5 => "_🔹 ",
-        HeadingLevel::H6 => "_✴️ ",
-    }
-}
-
-fn heading_closer(level: HeadingLevel) -> &'static str {
-    match level {
-        HeadingLevel::H1 | HeadingLevel::H2 | HeadingLevel::H3 | HeadingLevel::H4 => "*",
-        HeadingLevel::H5 | HeadingLevel::H6 => "_",
-    }
-}
-
-/// Escape Telegram MarkdownV2 control characters into the provided buffer.
-fn push_escaped(out: &mut String, text: &str) {
+fn escape_text(text: &str) -> String {
+    // Single pass escape to avoid O(n*k) replace chaining.
+    let mut out = String::with_capacity(text.len() * 2); // worst case every char escapes
     for ch in text.chars() {
         match ch {
             '\\' | '*' | '_' | '[' | ']' | '(' | ')' | '~' | '`' | '>' | '#' | '+' | '-' | '='
@@ -918,45 +540,5 @@ fn push_escaped(out: &mut String, text: &str) {
             _ => out.push(ch),
         }
     }
-}
-
-fn escape_str(text: &str) -> String {
-    let mut out = String::with_capacity(text.len());
-    push_escaped(&mut out, text);
     out
-}
-
-impl PartialEq for Descriptor {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Descriptor::Strong, Descriptor::Strong) => true,
-            (Descriptor::Emphasis, Descriptor::Emphasis) => true,
-            (Descriptor::CodeBlock(_), Descriptor::CodeBlock(_)) => true,
-            (Descriptor::Code, Descriptor::Code) => true,
-            (Descriptor::Strikethrough, Descriptor::Strikethrough) => true,
-            (Descriptor::Heading(a), Descriptor::Heading(b)) => a == b,
-            _ => unimplemented!(),
-        }
-    }
-}
-
-impl Eq for Descriptor {}
-
-#[derive(Debug, Default)]
-struct ListState {
-    ordered: bool,
-    start: u64,
-    items: usize,
-    extra_levels: usize,
-}
-
-impl ListState {
-    fn new(n: Option<u64>, extra_levels: usize) -> Self {
-        Self {
-            ordered: n.is_some(),
-            start: n.unwrap_or(1),
-            items: 0,
-            extra_levels,
-        }
-    }
 }
