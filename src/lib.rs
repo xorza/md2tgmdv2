@@ -67,9 +67,7 @@ impl Converter {
     }
 
     fn new_line(&mut self) {
-        if !self.result.last_mut().unwrap().is_empty() {
-            self.new_line = true;
-        }
+        self.new_line = true;
     }
 
     fn url(&mut self, txt: &str, url: &str) {
@@ -82,7 +80,9 @@ impl Converter {
         let last = self.result.last_mut().unwrap();
 
         if self.new_line {
-            last.push_str("\n");
+            if !last.is_empty() {
+                last.push_str("\n");
+            }
             if self.quote_level > 0 {
                 last.push_str(&">".repeat(self.quote_level as usize));
             }
@@ -328,7 +328,12 @@ impl Converter {
                 }
                 Event::Rule => {
                     self.new_line();
-                    self.text("\n———\n");
+                    self.text("");
+                    self.new_line();
+                    self.text("");
+                    self.text("———");
+                    self.new_line();
+                    self.text("");
                     self.new_line();
 
                     println!("Rule");
@@ -379,7 +384,8 @@ impl Converter {
             }
             Tag::BlockQuote(_) => {
                 self.quote_level += 1;
-                self.prefix.push('>');
+                self.new_line();
+                // self.prefix.push('>');
 
                 println!("BlockQuote");
             }
