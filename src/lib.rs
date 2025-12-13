@@ -7,7 +7,7 @@
 
 use anyhow::anyhow;
 use pulldown_cmark::{CodeBlockKind, Event, HeadingLevel, Options, Parser, Tag, TagEnd};
-use std::ops::Range;
+use std::{hash::BuildHasher, ops::Range};
 
 /// Telegram MarkdownV2 message hard limit.
 pub const TELEGRAM_BOT_MAX_MESSAGE_LENGTH: usize = 4096;
@@ -63,32 +63,28 @@ impl Converter {
     }
 
     fn new_line(&mut self) {
-        self.result.last_mut().unwrap().push_str("\n");
-
-        // if self.quote_level > 0 {
-        //     last.push_str(&">".repeat(self.quote_level as usize));
-        // }
+        let last = self.result.last_mut().unwrap();
+        last.push_str("\n");
+        if self.quote_level > 0 {
+            last.push_str(&">".repeat(self.quote_level as usize));
+        }
     }
 
     fn url(&mut self, txt: &str, url: &str) {
         let txt = escape_text(txt);
         let url = escape_text(url);
-        self.text(&format!("[{}]({})", txt, url), false);
+        self.text(&format!("[{}]({})", txt, url));
     }
 
-    fn text(&mut self, txt: &str, escape: bool) {
+    fn text(&mut self, txt: &str) {
+        self.build_prefix();
+
         let last = self.result.last_mut().unwrap();
+        last.push_str(txt);
+    }
 
-        // if last.is_empty() && self.quote_level > 0 {
-        //     last.push_str(&">".repeat(self.quote_level as usize));
-        // }
-
-        if escape {
-            let escaped = escape_text(&txt);
-            last.push_str(&escaped);
-        } else {
-            last.push_str(txt);
-        }
+    fn build_prefix(&mut self) {
+        // todo
     }
 
     /// Convert Markdown into Telegram MarkdownV2 and split into safe chunks.
@@ -112,44 +108,45 @@ impl Converter {
                     self.end_tag(tag)?;
                 }
                 Event::Text(txt) => {
+                    let txt = escape_text(&txt);
                     match self.link.as_mut() {
                         Some(link) => {
                             link.title.push_str(&txt);
                         }
-                        None => self.text(&txt, true),
+                        None => self.text(&txt),
                     }
 
                     println!("Text {}", txt);
                 }
                 Event::Code(txt) => {
                     self.stack.push(Descriptor::Code);
-                    self.text(&txt, true);
+                    self.text(&escape_text(&txt));
                     self.stack.pop();
 
                     println!("Code");
                 }
                 Event::InlineMath(txt) => {
-                    self.text(&txt, true);
+                    self.text(&escape_text(&txt));
 
                     println!("InlineMath");
                 }
                 Event::DisplayMath(txt) => {
-                    self.text(&txt, true);
+                    self.text(&escape_text(&txt));
 
                     println!("DisplayMath");
                 }
                 Event::Html(txt) => {
-                    self.text(&txt, true);
+                    self.text(&escape_text(&txt));
 
                     println!("Html");
                 }
                 Event::InlineHtml(txt) => {
-                    self.text(&txt, true);
+                    self.text(&escape_text(&txt));
 
                     println!("InlineHtml");
                 }
                 Event::FootnoteReference(txt) => {
-                    self.text(&txt, true);
+                    self.text(&escape_text(&txt));
 
                     println!("FootnoteReference");
                 }
@@ -164,15 +161,18 @@ impl Converter {
                     println!("HardBreak");
                 }
                 Event::Rule => {
-                    self.text("\n————————\n\n", false);
+                    self.new_line();
+                    self.text("———");
+                    self.new_line();
+                    self.new_line();
 
                     println!("Rule");
                 }
                 Event::TaskListMarker(b) => {
                     if b {
-                        self.text("☑️", false);
+                        self.text("☑️");
                     } else {
-                        self.text("☐", false);
+                        self.text("☐");
                     }
 
                     println!("TaskListMarker({})", b);
