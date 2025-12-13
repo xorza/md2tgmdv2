@@ -365,6 +365,8 @@ impl Converter {
     fn start_tag(&mut self, tag: Tag) -> anyhow::Result<()> {
         match tag {
             Tag::Paragraph => {
+                self.new_line();
+
                 println!("Paragraph");
             }
             Tag::Heading { level, .. } => {
