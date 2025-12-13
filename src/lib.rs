@@ -19,6 +19,7 @@ pub struct Converter {
     stack: Vec<Descriptor>,
     quote_level: u8,
     link: Option<Link>,
+    new_line: bool,
 
     // use for operations on temporary strings to avoid allocations
     buffer: String,
@@ -51,6 +52,7 @@ impl Default for Converter {
             stack: Vec::new(),
             quote_level: 0,
             link: None,
+            new_line: true,
 
             buffer: String::new(),
         }
@@ -71,6 +73,7 @@ impl Converter {
         if self.quote_level > 0 {
             last.push_str(&">".repeat(self.quote_level as usize));
         }
+        self.new_line = true;
     }
 
     fn url(&mut self, txt: &str, url: &str) {
@@ -80,16 +83,44 @@ impl Converter {
     }
 
     fn text(&mut self, txt: &str) {
-        self.build_prefix();
-
+        let prefix = self.build_prefix();
         let last = self.result.last_mut().unwrap();
+        last.push_str(&prefix);
         last.push_str(txt);
-        // Suffix collected in `self.buffer` inside `build_prefix`.
-        last.push_str(&self.buffer);
-        self.buffer.clear();
+        self.new_line = false;
+    }
+
+    fn postfix(&mut self, desc: Descriptor) {
+        let last = self.result.last_mut().unwrap();
+        match desc {
+            Descriptor::ListItem => {}
+            Descriptor::List { .. } => {}
+            Descriptor::CodeBlock { .. } => {
+                last.push_str("```\n");
+            }
+            Descriptor::Code => {
+                last.push_str("`");
+            }
+            Descriptor::Heading(level) => {
+                last.push_str("\n");
+            }
+            Descriptor::Emphasis => {
+                last.push_str("*");
+            }
+            Descriptor::Strong => {
+                last.push_str("*");
+            }
+            Descriptor::Strikethrough => {
+                last.push_str("~");
+            }
+        }
     }
 
     fn build_prefix(&mut self) -> String {
+        if !self.new_line {
+            return String::new();
+        }
+
         // Clear reusable buffer that will hold the suffix.
         self.buffer.clear();
 
@@ -129,12 +160,12 @@ impl Converter {
             match desc {
                 Descriptor::Heading(level) => {
                     let marker = match level {
-                        1 => "**🌟 ",
-                        2 => "**⭐ ",
-                        3 => "**✨ ",
-                        4 => "**🔸 ",
-                        5 => "__🔹 ",
-                        _ => "__✴️ ",
+                        1 => "*🌟 ",
+                        2 => "*⭐ ",
+                        3 => "*✨ ",
+                        4 => "*🔸 ",
+                        5 => "_🔹 ",
+                        _ => "_✴️ ",
                     };
                     self.buffer.push_str(marker);
                 }
@@ -145,7 +176,7 @@ impl Converter {
                     self.buffer.push('\n');
                 }
                 Descriptor::Strong => {
-                    self.buffer.push_str("**");
+                    self.buffer.push_str("*");
                 }
                 Descriptor::Emphasis => {
                     self.buffer.push('_');
@@ -285,12 +316,6 @@ impl Converter {
                     HeadingLevel::H6 => 6,
                 };
                 self.stack.push(Descriptor::Heading(level));
-                //self.prefix("*🌟 "),
-                // self.prefix("*⭐ "),
-                // self.prefix("*✨ "),
-                // self.prefix("*🔸 "),
-                // self.prefix("_🔹 "),
-                // self.prefix("_✴️ "),
 
                 println!("Heading");
             }
@@ -321,7 +346,6 @@ impl Converter {
                 println!("List");
             }
             Tag::Item => {
-                // self.prefix("⦁ ");
                 self.stack.push(Descriptor::ListItem);
 
                 println!("Item");
@@ -410,6 +434,7 @@ impl Converter {
                     matches!(desc, Descriptor::Heading { .. }),
                     "Unexpected end of list"
                 );
+                self.postfix(desc);
 
                 println!("EndHeading");
             }
@@ -424,6 +449,7 @@ impl Converter {
                     matches!(desc, Descriptor::CodeBlock { .. }),
                     "Unexpected end of list"
                 );
+                self.postfix(desc);
 
                 println!("EndCodeBlock");
             }
@@ -436,6 +462,7 @@ impl Converter {
                     matches!(desc, Descriptor::List { .. }),
                     "Unexpected end of list"
                 );
+                self.postfix(desc);
 
                 println!("EndList");
             }
@@ -445,6 +472,7 @@ impl Converter {
                     matches!(desc, Descriptor::ListItem),
                     "Unexpected end of list"
                 );
+                self.new_line();
 
                 println!("EndItem");
             }
@@ -477,12 +505,14 @@ impl Converter {
                     matches!(desc, Descriptor::Emphasis),
                     "Unexpected end of list"
                 );
+                self.postfix(desc);
 
                 println!("EndEmphasis");
             }
             TagEnd::Strong => {
                 let desc = self.stack.pop().expect("Unexpected end of list");
                 assert!(matches!(desc, Descriptor::Strong), "Unexpected end of list");
+                self.postfix(desc);
 
                 println!("EndStrong");
             }
@@ -492,6 +522,7 @@ impl Converter {
                     matches!(desc, Descriptor::Strikethrough),
                     "Unexpected end of list"
                 );
+                self.postfix(desc);
             }
             TagEnd::Link => {
                 let link = self.link.take().expect("Unexpected end of list");
