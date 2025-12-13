@@ -85,29 +85,29 @@ fn escapes_inline_code_markers() {
     );
 }
 
-// #[test]
-// fn converts_list_after_blank_line() {
-//     transform_expect_1(
-//         "Assume:\n\n- `MODEL_CONTEXT_TOKENS` = max",
-//         "Assume:\n⦁ `MODEL\\_CONTEXT\\_TOKENS` \\= max",
-//     );
-// }
+#[test]
+fn converts_list_after_blank_line() {
+    transform_expect_1(
+        "Assume:\n\n- `MODEL_CONTEXT_TOKENS` = max",
+        "Assume:\n⦁ `MODEL\\_CONTEXT\\_TOKENS` \\= max",
+    );
+}
 
-// #[test]
-// fn converts_list_after_blank_line1() {
-//     transform_expect_1(
-//         "Assume.\n- `MODEL_CONTEXT_TOKENS` = max",
-//         "Assume\\.\n⦁ `MODEL\\_CONTEXT\\_TOKENS` \\= max",
-//     );
-// }
+#[test]
+fn converts_list_after_blank_line1() {
+    transform_expect_1(
+        "Assume.\n- `MODEL_CONTEXT_TOKENS` = max",
+        "Assume\\.\n⦁ `MODEL\\_CONTEXT\\_TOKENS` \\= max",
+    );
+}
 
-// #[test]
-// fn escapes_inside_code_block_language() {
-//     transform_expect_1(
-//         "```text\ntoken_count(text)\n```",
-//         "```text\ntoken\\_count\\(text\\)\n```",
-//     );
-// }
+#[test]
+fn escapes_inside_code_block_language() {
+    transform_expect_1(
+        "```text\ntoken_count(text)\n```",
+        "```text\ntoken\\_count\\(text\\)\n```",
+    );
+}
 
 // #[test]
 // fn preserves_blockquote_blank_line_between_lines() {

@@ -118,8 +118,12 @@ impl Converter {
                 }
             }
             Descriptor::List { .. } => {}
-            Descriptor::CodeBlock { .. } => {
-                self.prefix.push_str("```\n");
+            Descriptor::CodeBlock(lang) => {
+                self.prefix.push_str("```");
+                if !lang.is_empty() {
+                    self.prefix.push_str(&lang);
+                }
+                self.prefix.push('\n');
             }
             Descriptor::Code => {
                 self.prefix.push_str("`");
@@ -152,7 +156,7 @@ impl Converter {
         match desc {
             Descriptor::ListItem => {}
             Descriptor::List { .. } => {}
-            Descriptor::CodeBlock { .. } => {
+            Descriptor::CodeBlock(_) => {
                 last.push_str("```\n");
             }
             Descriptor::Code => {
