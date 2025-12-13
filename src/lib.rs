@@ -19,7 +19,7 @@ pub struct Converter {
     stack: Vec<Descriptor>,
     quote_level: u8,
     list: bool,
-    link_dest_url: String,
+    link_dest_url: Option<String>,
     buffer: String,
 }
 
@@ -40,7 +40,7 @@ impl Default for Converter {
             stack: Vec::new(),
             quote_level: 0,
             list: false,
-            link_dest_url: String::new(),
+            link_dest_url: None,
             buffer: String::new(),
         }
     }
@@ -75,14 +75,10 @@ impl Converter {
                     self.end_tag(tag)?;
                 }
                 Event::Text(txt) => {
-                    if self.link_dest_url.is_empty() {
-                        self.output(&txt, true);
-                    } else {
-                        let txt = escape_text(&txt);
-                        let url = escape_text(&self.link_dest_url);
-                        self.output(&format!("[{}]({})", txt, url), false);
-
-                        self.link_dest_url.clear();
+                    let url = self.link_dest_url.take();
+                    match url {
+                        None => self.output(&txt, true),
+                        Some(url) => self.output_url(&txt, &url),
                     }
 
                     println!("Text {}", txt);
@@ -135,6 +131,7 @@ impl Converter {
                     self.new_line();
                     self.output("————————", true);
                     self.new_line();
+                    self.new_line();
 
                     println!("Rule");
                 }
@@ -155,6 +152,12 @@ impl Converter {
         }
 
         Ok(std::mem::take(&mut self.result))
+    }
+
+    fn output_url(&mut self, txt: &str, url: &str) {
+        let txt = escape_text(txt);
+        let url = escape_text(url);
+        self.output(&format!("[{}]({})", txt, url), false);
     }
 
     fn new_line(&mut self) {
@@ -270,13 +273,15 @@ impl Converter {
                 println!("Strikethrough");
             }
             Tag::Link { dest_url, .. } => {
-                assert!(self.link_dest_url.is_empty());
+                assert!(self.link_dest_url.is_none());
 
-                self.link_dest_url = dest_url.to_string();
+                self.link_dest_url = Some(dest_url.to_string());
 
                 println!("Link");
             }
-            Tag::Image { .. } => {
+            Tag::Image { dest_url, .. } => {
+                self.output_url("Image", &dest_url);
+
                 println!("Image");
             }
             Tag::MetadataBlock(_) => {
