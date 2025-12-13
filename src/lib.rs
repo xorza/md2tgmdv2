@@ -17,18 +17,16 @@ pub struct Converter {
     max_len: usize,
     result: Vec<String>,
     stack: Vec<Descriptor>,
-    add_new_line: bool,
     quote_level: u8,
     list: bool,
     link_dest_url: String,
     buffer: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum Descriptor {
     Strong,
     Emphasis,
-    #[allow(dead_code)]
     CodeBlock(String),
     Strikethrough,
     Code,
@@ -40,7 +38,6 @@ impl Default for Converter {
             max_len: TELEGRAM_BOT_MAX_MESSAGE_LENGTH,
             result: vec![],
             stack: Vec::new(),
-            add_new_line: false,
             quote_level: 0,
             list: false,
             link_dest_url: String::new(),
@@ -125,24 +122,23 @@ impl Converter {
                     println!("FootnoteReference");
                 }
                 Event::SoftBreak => {
-                    self.add_new_line = true;
+                    self.new_line();
 
                     println!("SoftBreak");
                 }
                 Event::HardBreak => {
-                    self.add_new_line = true;
+                    self.new_line();
 
                     println!("HardBreak");
                 }
                 Event::Rule => {
                     self.new_line();
                     self.output("————————", true);
-                    self.add_new_line = true;
+                    self.new_line();
 
                     println!("Rule");
                 }
                 Event::TaskListMarker(b) => {
-                    self.new_line();
                     if b {
                         self.output("☑️", false);
                     } else {
@@ -174,14 +170,6 @@ impl Converter {
     fn output(&mut self, txt: &str, escape: bool) {
         let last = self.result.last_mut().unwrap();
 
-        if self.add_new_line {
-            last.push_str("\n");
-            if self.quote_level > 0 {
-                last.push_str(&">".repeat(self.quote_level as usize));
-            }
-            self.add_new_line = false;
-        }
-
         if last.is_empty() && self.quote_level > 0 {
             last.push_str(&">".repeat(self.quote_level as usize));
         }
@@ -197,17 +185,15 @@ impl Converter {
     fn start_tag(&mut self, tag: Tag) -> anyhow::Result<()> {
         match tag {
             Tag::Paragraph => {
-                self.new_line();
-
                 println!("Paragraph");
             }
             Tag::Heading { level, .. } => {
                 self.new_line();
                 match level {
-                    HeadingLevel::H1 => self.output("**🌟 ", false),
-                    HeadingLevel::H2 => self.output("**⭐ ", false),
-                    HeadingLevel::H3 => self.output("**✨ ", false),
-                    HeadingLevel::H4 => self.output("**🔸 ", false),
+                    HeadingLevel::H1 => self.output("*🌟 ", false),
+                    HeadingLevel::H2 => self.output("*⭐ ", false),
+                    HeadingLevel::H3 => self.output("*✨ ", false),
+                    HeadingLevel::H4 => self.output("*🔸 ", false),
                     HeadingLevel::H5 => self.output("_🔹 ", false),
                     HeadingLevel::H6 => self.output("_✴️ ", false),
                 }
@@ -226,7 +212,7 @@ impl Converter {
                 };
                 self.output("```", false);
                 self.output(&lang, true);
-                self.add_new_line = true;
+                self.new_line();
                 self.stack.push(Descriptor::CodeBlock(lang));
 
                 println!("CodeBlock");
@@ -240,7 +226,6 @@ impl Converter {
                 println!("List");
             }
             Tag::Item => {
-                self.new_line();
                 self.output("⦁ ", false);
 
                 println!("Item");
@@ -273,7 +258,7 @@ impl Converter {
                 println!("Emphasis");
             }
             Tag::Strong => {
-                self.output("**", false);
+                self.output("*", false);
                 self.stack.push(Descriptor::Strong);
 
                 println!("Strong");
@@ -314,32 +299,30 @@ impl Converter {
     fn end_tag(&mut self, tag: TagEnd) -> anyhow::Result<()> {
         match tag {
             TagEnd::Paragraph => {
-                self.add_new_line = true;
+                self.new_line();
 
                 println!("EndParagraph");
             }
             TagEnd::Heading(level) => {
                 match level {
-                    HeadingLevel::H1 => self.output("**", false),
-                    HeadingLevel::H2 => self.output("**", false),
-                    HeadingLevel::H3 => self.output("**", false),
-                    HeadingLevel::H4 => self.output("**", false),
+                    HeadingLevel::H1 => self.output("*", false),
+                    HeadingLevel::H2 => self.output("*", false),
+                    HeadingLevel::H3 => self.output("*", false),
+                    HeadingLevel::H4 => self.output("*", false),
                     HeadingLevel::H5 => self.output("_", false),
                     HeadingLevel::H6 => self.output("_", false),
                 }
-                self.add_new_line = true;
 
                 println!("EndHeading");
             }
             TagEnd::BlockQuote(_) => {
-                self.add_new_line = true;
                 self.quote_level -= 1;
 
                 println!("EndBlockQuote");
             }
             TagEnd::CodeBlock => {
                 self.output("```", false);
-                self.add_new_line = true;
+                self.new_line();
                 self.close_descriptor(Descriptor::CodeBlock(String::new()))?;
 
                 println!("EndCodeBlock");
@@ -349,11 +332,12 @@ impl Converter {
             }
             TagEnd::List(_) => {
                 self.list = false;
-                self.add_new_line = true;
 
                 println!("EndList");
             }
             TagEnd::Item => {
+                self.new_line();
+
                 println!("EndItem");
             }
             TagEnd::FootnoteDefinition => {
@@ -366,6 +350,8 @@ impl Converter {
                 println!("EndTableHead");
             }
             TagEnd::TableRow => {
+                self.new_line();
+
                 println!("EndTableRow");
             }
             TagEnd::TableCell => {
@@ -384,7 +370,7 @@ impl Converter {
                 println!("EndEmphasis");
             }
             TagEnd::Strong => {
-                self.output("**", false);
+                self.output("*", false);
                 self.close_descriptor(Descriptor::Strong)?;
 
                 println!("EndStrong");
@@ -438,29 +424,3 @@ fn escape_text(text: &str) -> String {
     }
     out
 }
-
-impl PartialEq for Descriptor {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Descriptor::Strong, Descriptor::Strong) => true,
-            (Descriptor::Emphasis, Descriptor::Emphasis) => true,
-            (Descriptor::CodeBlock(_), Descriptor::CodeBlock(_)) => true,
-            (Descriptor::Code, Descriptor::Code) => true,
-            (Descriptor::Strikethrough, Descriptor::Strikethrough) => true,
-            _ => unimplemented!(),
-        }
-    }
-}
-
-impl Eq for Descriptor {}
-
-// #[test]
-// fn test() -> anyhow::Result<()> {
-//     let text = include_str!("../tests/1-input.md");
-//     let _ = transform(text, TELEGRAM_BOT_MAX_MESSAGE_LENGTH)?;
-
-//     let text = include_str!("../tests/3-input.md");
-//     let _ = transform(text, TELEGRAM_BOT_MAX_MESSAGE_LENGTH)?;
-
-//     Ok(())
-// }

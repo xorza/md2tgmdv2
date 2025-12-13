@@ -1,0 +1,38 @@
+Yes\.
+
+*✨ 1\) The standard CLI \(recommended\)*
+Install the official SQLite shell:
+```bash
+sudo apt update
+sudo apt install sqlite3
+```
+
+Use it:
+```bash
+sqlite3 /path/to/db\.sqlite
+```
+
+Inside:
+```sql
+\.tables
+\.schema
+\.headers on
+\.mode column
+select \* from mytable limit 20;
+\.quit
+```
+
+*✨ 2\) TUI/interactive editors \(if you want more “DB browser” feel in terminal\)*
+Common apt packages include:
+⦁ `litecli` \(auto\-completion, pretty output\)
+```bash
+sudo apt install litecli
+litecli /path/to/db\.sqlite
+```
+⦁ `visidata` \(spreadsheet\-like TUI; can open SQLite\)
+```bash
+sudo apt install visidata
+vd sqlite:///path/to/db\.sqlite
+```
+
+If you tell me what you want \(quick queries vs editing rows like a spreadsheet vs schema work\), I’ll recommend the best one\.
