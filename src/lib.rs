@@ -79,16 +79,18 @@ impl Converter {
     fn text(&mut self, txt: &str) {
         let last = self.result.last_mut().unwrap();
 
+        let mut newline = String::new();
         if self.new_line {
             if !last.is_empty() {
-                last.push_str("\n");
+                newline.push_str("\n");
             }
             if self.quote_level > 0 {
-                last.push_str(&">".repeat(self.quote_level as usize));
+                newline.push_str(&">".repeat(self.quote_level as usize));
             }
             self.new_line = false;
         }
 
+        last.push_str(&std::mem::take(&mut newline));
         last.push_str(&std::mem::take(&mut self.prefix));
         last.push_str(txt);
     }
