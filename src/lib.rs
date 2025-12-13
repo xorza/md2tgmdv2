@@ -196,6 +196,19 @@ impl Converter {
     fn new_prefix(&mut self) -> String {
         let mut prefix = String::new();
 
+        let depth = self
+            .stack
+            .iter()
+            .filter(|d| matches!(d, Descriptor::List { .. }))
+            .count();
+
+        // Two spaces per nesting level (skip the first level).
+        if depth > 1 {
+            for _ in 0..((depth - 1) * 2) {
+                self.prefix.push(' ');
+            }
+        }
+
         // Build prefix and suffix for inline formatting. We open from outermost to
         // innermost, and close in reverse order by accumulating into `self.buffer`.
         for desc in self.stack.iter() {
