@@ -178,6 +178,11 @@ impl Converter {
         if frame.applied_in_chunk {
             let marker = self.closing_marker(&frame.desc);
             if let Some(last) = self.result.last_mut() {
+                if matches!(frame.desc, Descriptor::CodeBlock(_)) {
+                    if !last.is_empty() && !last.ends_with('\n') {
+                        last.push('\n');
+                    }
+                }
                 last.push_str(&marker);
             }
         } else if !frame.open_marker.is_empty() && self.prefix.ends_with(&frame.open_marker) {
@@ -200,6 +205,13 @@ impl Converter {
         let mut suffix = String::new();
         for frame in self.stack.iter().rev() {
             if frame.applied_in_chunk {
+                if matches!(frame.desc, Descriptor::CodeBlock(_)) {
+                    if let Some(last) = self.result.last_mut() {
+                        if !last.is_empty() && !last.ends_with('\n') {
+                            last.push('\n');
+                        }
+                    }
+                }
                 suffix.push_str(&self.closing_marker(&frame.desc));
             }
         }
