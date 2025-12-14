@@ -263,62 +263,62 @@ fn keeps_words_when_len_allows() {
     transform_expect_n("12345 12345", "12345 12345", 11);
 }
 
-// #[test]
-// fn splits_code_block_line_len_18() {
-//     transform_expect_n(
-//         "```\n1234567890\n1234567890\n```",
-//         "```\n1234567890\n```===```\n1234567890\n```",
-//         18,
-//     );
-// }
+#[test]
+fn splits_code_block_line_len_18() {
+    transform_expect_n(
+        "```\n1234567890\n1234567890\n```",
+        "```\n1234567890\n```===```\n1234567890\n```",
+        18,
+    );
+}
 
-// #[test]
-// fn splits_code_block_line_len_19() {
-//     transform_expect_n(
-//         "```\n1234567890\n1234567890\n```",
-//         "```\n1234567890\n```===```\n1234567890\n```",
-//         19,
-//     );
-// }
+#[test]
+fn splits_code_block_line_len_19() {
+    transform_expect_n(
+        "```\n1234567890\n1234567890\n```",
+        "```\n1234567890\n```===```\n1234567890\n```",
+        19,
+    );
+}
 
-// #[test]
-// fn splits_code_block_line_len_28() {
-//     transform_expect_n(
-//         "```\n1234567890\n1234567890\n```",
-//         "```\n1234567890\n```===```\n1234567890\n```",
-//         28,
-//     );
-// }
+#[test]
+fn splits_code_block_line_len_28() {
+    transform_expect_n(
+        "```\n1234567890\n1234567890\n```",
+        "```\n1234567890\n```===```\n1234567890\n```",
+        28,
+    );
+}
 
-// #[test]
-// fn keeps_code_block_line_len_29() {
-//     transform_expect_n(
-//         "```\n1234567890\n1234567890\n```",
-//         "```\n1234567890\n1234567890\n```",
-//         29,
-//     );
-// }
+#[test]
+fn keeps_code_block_line_len_29() {
+    transform_expect_n(
+        "```\n1234567890\n1234567890\n```",
+        "```\n1234567890\n1234567890\n```",
+        29,
+    );
+}
 
-// #[test]
-// fn splits_mixed_text_and_code_block() {
-//     transform_expect_n(
-//         "this text is 30ty chars long11\n```\n1234567890\n1234567890\n```",
-//         "this text is 30ty chars long11===```\n1234567890\n1234567890\n```",
-//         40,
-//     );
-// }
+#[test]
+fn splits_mixed_text_and_code_block() {
+    transform_expect_n(
+        "this text is 30ty chars long11\n```\n1234567890\n1234567890\n```",
+        "this text is 30ty chars long11===```\n1234567890\n1234567890\n```",
+        40,
+    );
+}
 
-// #[test]
-// fn removes_empty_lines_on_split_3() {
-//     transform_expect_n("1234567890\n\n1234567890", "1234567890===1234567890", 10);
-// }
+#[test]
+fn removes_empty_lines_on_split_3() {
+    transform_expect_n("1234567890\n\n1234567890", "1234567890===1234567890", 10);
+}
 
-// #[test]
-// fn url_not_split_across_chunks() {
-//     let input = "1234567890123456789012345678901234567890123456789012345678901234567890 [see docs](https://example.com/path)";
-//     let expected = "1234567890123456789012345678901234567890123456789012345678901234567890===[see docs](https://example\\.com/path)";
-//     transform_expect_n(input, expected, 80);
-// }
+#[test]
+fn url_not_split_across_chunks() {
+    let input = "1234567890123456789012345678901234567890123456789012345678901234567890 [see docs](https://example.com/path)";
+    let expected = "1234567890123456789012345678901234567890123456789012345678901234567890===[see docs](https://example\\.com/path)";
+    transform_expect_n(input, expected, 80);
+}
 
 #[test]
 fn asd() {

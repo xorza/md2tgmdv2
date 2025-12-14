@@ -260,6 +260,70 @@ impl Converter {
         len
     }
 
+    /// If the start of `text` is a Markdown link `[...] (...)` return its byte length.
+    /// Escaped parentheses inside are ignored when searching for the closing `)`.
+    fn unsplittable_link_len(text: &str) -> Option<usize> {
+        let bytes = text.as_bytes();
+        if bytes.first().copied() != Some(b'[') {
+            return None;
+        }
+
+        let mut i = 1;
+        let len = bytes.len();
+        let mut mid = None;
+        while i + 1 < len {
+            match bytes[i] {
+                b'\\' => {
+                    i += 2;
+                    continue;
+                }
+                b']' if bytes[i + 1] == b'(' => {
+                    mid = Some(i);
+                    i += 2;
+                    break;
+                }
+                _ => i += 1,
+            }
+        }
+
+        if mid.is_none() {
+            return None;
+        }
+
+        while i < len {
+            match bytes[i] {
+                b'\\' => {
+                    i += 2;
+                    continue;
+                }
+                b')' => return Some(i + 1),
+                _ => i += 1,
+            }
+        }
+
+        None
+    }
+
+    /// If text starts with an url-like token (http/https) return its length until whitespace.
+    fn unsplittable_url_like_len(text: &str) -> Option<usize> {
+        if text.starts_with("http://") || text.starts_with("https://") {
+            return Some(Converter::first_word_len(text));
+        }
+        None
+    }
+
+    fn leading_whitespace_len(text: &str) -> usize {
+        let mut len = 0;
+        for ch in text.chars() {
+            if ch.is_whitespace() {
+                len += ch.len_utf8();
+            } else {
+                break;
+            }
+        }
+        len
+    }
+
     fn find_split_point(text: &str, limit: usize) -> (usize, Option<char>) {
         if text.len() <= limit {
             return (text.len(), None);
@@ -323,21 +387,36 @@ impl Converter {
 
             let prefix_str = self.prefix.clone();
             let closing_len_if_applied = self.all_postfix_len();
-            let first_word = Converter::first_word_len(remaining);
 
-            if first_word == 0 {
-                // No visible text, just flush pending prefix/newline and return.
-                if !newline.is_empty() || !prefix_str.is_empty() {
-                    let last = self.result.last_mut().unwrap();
-                    last.push_str(&newline);
-                    last.push_str(&prefix_str);
-                    self.mark_pending_prefix_applied();
-                    self.new_line = false;
+            let leading_ws = Converter::leading_whitespace_len(remaining);
+            let after_ws = &remaining[leading_ws..];
+
+            let token_len;
+            let mut unsplittable = false;
+
+            if let Some(len) = Converter::unsplittable_link_len(after_ws) {
+                token_len = leading_ws + len;
+                unsplittable = true;
+            } else if let Some(len) = Converter::unsplittable_url_like_len(after_ws) {
+                token_len = leading_ws + len;
+                unsplittable = true;
+            } else {
+                let first_word = Converter::first_word_len(after_ws);
+                if first_word == 0 {
+                    // No visible text, just flush pending prefix/newline and return.
+                    if !newline.is_empty() || !prefix_str.is_empty() {
+                        let last = self.result.last_mut().unwrap();
+                        last.push_str(&newline);
+                        last.push_str(&prefix_str);
+                        self.mark_pending_prefix_applied();
+                        self.new_line = false;
+                    }
+                    break;
                 }
-                break;
+                token_len = leading_ws + first_word;
             }
 
-            if last_len + newline.len() + prefix_str.len() + closing_len_if_applied + first_word
+            if last_len + newline.len() + prefix_str.len() + closing_len_if_applied + token_len
                 > self.max_len
             {
                 // Nothing fits, split before the newline.
@@ -348,7 +427,17 @@ impl Converter {
             let available = self.max_len
                 - (last_len + newline.len() + prefix_str.len() + closing_len_if_applied);
 
-            let (split_at, split_char) = Converter::find_split_point(remaining, available);
+            if unsplittable && token_len > available {
+                // Move to next chunk to keep token intact.
+                self.close_current_chunk();
+                continue;
+            }
+
+            let (split_at, split_char) = if unsplittable {
+                (token_len.min(available), None)
+            } else {
+                Converter::find_split_point(remaining, available)
+            };
             let first_part = &remaining[..split_at];
 
             {
