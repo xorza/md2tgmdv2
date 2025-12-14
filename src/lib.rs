@@ -16,7 +16,7 @@ pub const TELEGRAM_BOT_MAX_MESSAGE_LENGTH: usize = 4096;
 pub struct Converter {
     max_len: usize,
     result: Vec<String>,
-    stack: Vec<Descriptor>,
+    stack: Vec<Frame>,
     quote_level: u8,
     link: Option<Link>,
     new_line: bool,
@@ -29,6 +29,13 @@ pub struct Converter {
 pub struct Link {
     url: String,
     title: String,
+}
+
+#[derive(Debug, Clone)]
+struct Frame {
+    desc: Descriptor,
+    open_marker: String,
+    applied_in_chunk: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -76,67 +83,70 @@ impl Converter {
         self.text(&format!("[{}]({})", txt, url));
     }
 
-    fn text(&mut self, txt: &str) {
-        let last = self.result.last_mut().unwrap();
-
-        let mut newline = String::new();
-        if self.new_line {
-            if !last.is_empty() {
-                newline.push_str("\n");
+    fn closing_marker(&self, desc: &Descriptor) -> String {
+        match desc {
+            Descriptor::ListItem => String::new(),
+            Descriptor::List { .. } => String::new(),
+            Descriptor::CodeBlock(_) => "```\n".to_string(),
+            Descriptor::Code => "`".to_string(),
+            Descriptor::Heading(level) => {
+                let marker = match level {
+                    1 | 2 | 3 | 4 => "*",
+                    5 | _ => "_",
+                };
+                marker.to_string()
             }
-            if self.quote_level > 0 {
-                newline.push_str(&">".repeat(self.quote_level as usize));
-            }
-            self.new_line = false;
+            Descriptor::Emphasis => "_".to_string(),
+            Descriptor::Strong => "*".to_string(),
+            Descriptor::Strikethrough => "~".to_string(),
         }
-
-        last.push_str(&std::mem::take(&mut newline));
-        last.push_str(&std::mem::take(&mut self.prefix));
-        last.push_str(txt);
     }
 
-    fn prefix(&mut self, desc: Descriptor) {
+    fn build_open_marker(&mut self, desc: &Descriptor) -> String {
         match desc {
             Descriptor::ListItem => {
                 let depth = self
                     .stack
                     .iter()
-                    .filter(|d| matches!(d, Descriptor::List { .. }))
+                    .filter(|f| matches!(f.desc, Descriptor::List { .. }))
                     .count();
 
+                let mut marker = String::new();
                 // Two spaces per nesting level (skip the first level).
                 if depth > 1 {
                     for _ in 0..((depth - 1) * 2) {
-                        self.prefix.push(' ');
+                        marker.push(' ');
                     }
                 }
+
                 let (ordered, index) = self
                     .stack
                     .iter_mut()
                     .rev()
-                    .find_map(|d| match d {
+                    .find_map(|f| match &mut f.desc {
                         Descriptor::List { ordered, index } => Some((*ordered, index)),
                         _ => None,
                     })
                     .expect("No list found");
                 if ordered {
-                    self.prefix.push_str(&format!("{}\\. ", index));
+                    marker.push_str(&format!("{}\\. ", index));
                     *index += 1;
                 } else {
-                    self.prefix.push_str("⦁ ");
+                    marker.push_str("⦁ ");
                 }
+
+                marker
             }
-            Descriptor::List { .. } => {}
+            Descriptor::List { .. } => String::new(),
             Descriptor::CodeBlock(lang) => {
-                self.prefix.push_str("```");
+                let mut marker = String::from("```");
                 if !lang.is_empty() {
-                    self.prefix.push_str(&lang);
+                    marker.push_str(lang);
                 }
-                self.prefix.push('\n');
+                marker.push('\n');
+                marker
             }
-            Descriptor::Code => {
-                self.prefix.push_str("`");
-            }
+            Descriptor::Code => "`".to_string(),
             Descriptor::Heading(level) => {
                 let marker = match level {
                     1 => "*🌟 ",
@@ -146,111 +156,227 @@ impl Converter {
                     5 => "_🔹 ",
                     _ => "_✴️ ",
                 };
-                self.prefix.push_str(marker);
+                marker.to_string()
             }
-            Descriptor::Emphasis => {
-                self.prefix.push_str("_");
-            }
-            Descriptor::Strong => {
-                self.prefix.push_str("*");
-            }
-            Descriptor::Strikethrough => {
-                self.prefix.push_str("~");
-            }
+            Descriptor::Emphasis => "_".to_string(),
+            Descriptor::Strong => "*".to_string(),
+            Descriptor::Strikethrough => "~".to_string(),
         }
     }
 
-    fn postfix(&mut self, desc: Descriptor) {
-        let last = self.result.last_mut().unwrap();
-        match desc {
-            Descriptor::ListItem => {}
-            Descriptor::List { .. } => {}
-            Descriptor::CodeBlock(_) => {
-                last.push_str("```\n");
+    fn push_frame(&mut self, desc: Descriptor) {
+        let open_marker = self.build_open_marker(&desc);
+        self.prefix.push_str(&open_marker);
+        self.stack.push(Frame {
+            desc,
+            open_marker,
+            applied_in_chunk: false,
+        });
+    }
+
+    fn close_frame(&mut self, frame: Frame) {
+        if frame.applied_in_chunk {
+            let marker = self.closing_marker(&frame.desc);
+            if let Some(last) = self.result.last_mut() {
+                last.push_str(&marker);
             }
-            Descriptor::Code => {
-                last.push_str("`");
-            }
-            Descriptor::Heading(level) => {
-                let marker = match level {
-                    1 => "*",
-                    2 => "*",
-                    3 => "*",
-                    4 => "*",
-                    5 => "_",
-                    _ => "_",
-                };
-                last.push_str(marker);
-            }
-            Descriptor::Emphasis => {
-                last.push_str("_");
-            }
-            Descriptor::Strong => {
-                last.push_str("*");
-            }
-            Descriptor::Strikethrough => {
-                last.push_str("~");
-            }
+        } else if !frame.open_marker.is_empty() && self.prefix.ends_with(&frame.open_marker) {
+            let new_len = self.prefix.len() - frame.open_marker.len();
+            self.prefix.truncate(new_len);
         }
     }
 
-    #[allow(dead_code)]
-    fn new_prefix(&mut self) -> String {
-        let mut prefix = String::new();
-
-        let depth = self
-            .stack
+    fn all_postfix_len(&self) -> usize {
+        self.stack
             .iter()
-            .filter(|d| matches!(d, Descriptor::List { .. }))
-            .count();
+            .map(|f| self.closing_marker(&f.desc).len())
+            .sum()
+    }
 
-        // Two spaces per nesting level (skip the first level).
-        if depth > 1 {
-            for _ in 0..((depth - 1) * 2) {
-                self.prefix.push(' ');
+    fn append_postfix_for_applied(&mut self) {
+        if self.stack.is_empty() {
+            return;
+        }
+        let mut suffix = String::new();
+        for frame in self.stack.iter().rev() {
+            if frame.applied_in_chunk {
+                suffix.push_str(&self.closing_marker(&frame.desc));
+            }
+        }
+        if !suffix.is_empty() {
+            if let Some(last) = self.result.last_mut() {
+                last.push_str(&suffix);
+            }
+        }
+    }
+
+    fn rebuild_prefix_from_stack(&mut self) {
+        self.prefix.clear();
+        for frame in &self.stack {
+            self.prefix.push_str(&frame.open_marker);
+        }
+    }
+
+    fn mark_pending_prefix_applied(&mut self) {
+        if self.prefix.is_empty() {
+            return;
+        }
+        for frame in self.stack.iter_mut() {
+            if !frame.applied_in_chunk {
+                frame.applied_in_chunk = true;
+            }
+        }
+        self.prefix.clear();
+    }
+
+    fn close_current_chunk(&mut self) {
+        // add postfixes for everything that is currently opened in this chunk
+        self.append_postfix_for_applied();
+
+        // start new chunk
+        self.result.push(String::new());
+
+        // reopen prefixes in the next chunk
+        for frame in self.stack.iter_mut() {
+            frame.applied_in_chunk = false;
+        }
+        self.rebuild_prefix_from_stack();
+    }
+
+    fn first_word_len(text: &str) -> usize {
+        let mut started = false;
+        let mut len = 0;
+        for ch in text.chars() {
+            if ch.is_whitespace() {
+                if started {
+                    break;
+                } else {
+                    continue;
+                }
+            }
+            started = true;
+            len += ch.len_utf8();
+        }
+        len
+    }
+
+    fn find_split_point(text: &str, limit: usize) -> (usize, Option<char>) {
+        if text.len() <= limit {
+            return (text.len(), None);
+        }
+
+        let mut last_ws: Option<(usize, char)> = None;
+        for (idx, ch) in text.char_indices() {
+            if idx > limit {
+                break;
+            }
+            if ch.is_whitespace() {
+                if idx > 0 {
+                    last_ws = Some((idx, ch));
+                }
             }
         }
 
-        // Build prefix and suffix for inline formatting. We open from outermost to
-        // innermost, and close in reverse order by accumulating into `self.buffer`.
-        for desc in self.stack.iter() {
-            match desc {
-                Descriptor::Heading(level) => {
-                    let marker = match level {
-                        1 => "*",
-                        2 => "*",
-                        3 => "*",
-                        4 => "*",
-                        5 => "_",
-                        _ => "_",
-                    };
-                    prefix.push_str(marker);
+        if let Some((idx, ch)) = last_ws {
+            (idx, Some(ch))
+        } else {
+            (limit, None)
+        }
+    }
+
+    fn text(&mut self, txt: &str) {
+        if txt.is_empty() {
+            let last_len = self.result.last().map(|s| s.len()).unwrap_or(0);
+            let mut newline = String::new();
+            if self.new_line {
+                if last_len > 0 {
+                    newline.push('\n');
                 }
-                Descriptor::CodeBlock(lang) => {
-                    let lang = escape_text(lang);
-                    prefix.push_str("```");
-                    prefix.push_str(&lang);
-                    prefix.push('\n');
+                if self.quote_level > 0 {
+                    newline.push_str(&">".repeat(self.quote_level as usize));
                 }
-                Descriptor::Strong => {
-                    prefix.push_str("*");
-                }
-                Descriptor::Emphasis => {
-                    prefix.push('_');
-                }
-                Descriptor::Strikethrough => {
-                    prefix.push('~');
-                }
-                Descriptor::Code => {
-                    prefix.push('`');
-                }
-                Descriptor::List { .. } | Descriptor::ListItem => {
-                    // Not needed
-                }
+                self.new_line = false;
             }
+            if !newline.is_empty() || !self.prefix.is_empty() {
+                if let Some(last) = self.result.last_mut() {
+                    last.push_str(&newline);
+                    last.push_str(&self.prefix);
+                }
+                self.mark_pending_prefix_applied();
+            }
+            return;
         }
 
-        return prefix;
+        let mut remaining = txt;
+
+        while !remaining.is_empty() {
+            let last_len = self.result.last().map(|s| s.len()).unwrap_or(0);
+            let mut newline = String::new();
+            if self.new_line {
+                if last_len > 0 {
+                    newline.push('\n');
+                }
+                if self.quote_level > 0 {
+                    newline.push_str(&">".repeat(self.quote_level as usize));
+                }
+            }
+
+            let prefix_str = self.prefix.clone();
+            let closing_len_if_applied = self.all_postfix_len();
+            let first_word = Converter::first_word_len(remaining);
+
+            if first_word == 0 {
+                // No visible text, just flush pending prefix/newline and return.
+                if !newline.is_empty() || !prefix_str.is_empty() {
+                    let last = self.result.last_mut().unwrap();
+                    last.push_str(&newline);
+                    last.push_str(&prefix_str);
+                    self.mark_pending_prefix_applied();
+                    self.new_line = false;
+                }
+                break;
+            }
+
+            if last_len + newline.len() + prefix_str.len() + closing_len_if_applied + first_word
+                > self.max_len
+            {
+                // Nothing fits, split before the newline.
+                self.close_current_chunk();
+                continue;
+            }
+
+            let available = self.max_len
+                - (last_len + newline.len() + prefix_str.len() + closing_len_if_applied);
+
+            let (split_at, split_char) = Converter::find_split_point(remaining, available);
+            let first_part = &remaining[..split_at];
+
+            {
+                let last = self.result.last_mut().unwrap();
+                last.push_str(&newline);
+                last.push_str(&prefix_str);
+                last.push_str(first_part);
+            }
+
+            if self.new_line {
+                self.new_line = false;
+            }
+            self.mark_pending_prefix_applied();
+
+            let mut next_start = split_at;
+            if let Some(ch) = split_char {
+                next_start += ch.len_utf8();
+            }
+
+            if next_start < remaining.len() {
+                // Not all text fitted, move to new chunk.
+                self.close_current_chunk();
+                remaining = &remaining[next_start..];
+                continue;
+            }
+
+            break;
+        }
     }
 
     /// Convert Markdown into Telegram MarkdownV2 and split into safe chunks.
@@ -285,11 +411,12 @@ impl Converter {
                     println!("Text {}", txt);
                 }
                 Event::Code(txt) => {
-                    self.prefix(Descriptor::Code);
-                    self.stack.push(Descriptor::Code);
+                    let desc = Descriptor::Code;
+                    self.push_frame(desc.clone());
                     self.text(&escape_text(&txt));
-                    self.stack.pop();
-                    self.postfix(Descriptor::Code);
+                    let frame = self.stack.pop().expect("Unexpected end of list");
+                    assert!(frame.desc == desc, "Unexpected end of list");
+                    self.close_frame(frame);
 
                     println!("Code");
                 }
@@ -381,8 +508,7 @@ impl Converter {
                     HeadingLevel::H6 => 6,
                 };
                 let desc = Descriptor::Heading(level);
-                self.stack.push(desc.clone());
-                self.prefix(desc);
+                self.push_frame(desc);
 
                 println!("Heading");
             }
@@ -399,8 +525,7 @@ impl Converter {
                     CodeBlockKind::Indented => String::new(),
                 };
                 let desc = Descriptor::CodeBlock(lang);
-                self.stack.push(desc.clone());
-                self.prefix(desc);
+                self.push_frame(desc);
 
                 println!("CodeBlock");
             }
@@ -412,13 +537,12 @@ impl Converter {
                     ordered: list.is_some(),
                     index: list.unwrap_or(1) as u32,
                 };
-                self.stack.push(desc);
+                self.push_frame(desc);
 
                 println!("List {:?}", list);
             }
             Tag::Item => {
-                self.stack.push(Descriptor::ListItem);
-                self.prefix(Descriptor::ListItem);
+                self.push_frame(Descriptor::ListItem);
                 self.new_line();
 
                 println!("Item");
@@ -445,20 +569,17 @@ impl Converter {
                 println!("Superscript");
             }
             Tag::Emphasis => {
-                self.stack.push(Descriptor::Emphasis);
-                self.prefix(Descriptor::Emphasis);
+                self.push_frame(Descriptor::Emphasis);
 
                 println!("Emphasis");
             }
             Tag::Strong => {
-                self.stack.push(Descriptor::Strong);
-                self.prefix(Descriptor::Strong);
+                self.push_frame(Descriptor::Strong);
 
                 println!("Strong");
             }
             Tag::Strikethrough => {
-                self.stack.push(Descriptor::Strikethrough);
-                self.prefix(Descriptor::Strikethrough);
+                self.push_frame(Descriptor::Strikethrough);
 
                 println!("Strikethrough");
             }
@@ -505,12 +626,12 @@ impl Converter {
                 println!("EndParagraph");
             }
             TagEnd::Heading(_) => {
-                let desc = self.stack.pop().expect("Unexpected end of list");
+                let frame = self.stack.pop().expect("Unexpected end of list");
                 assert!(
-                    matches!(desc, Descriptor::Heading { .. }),
+                    matches!(frame.desc, Descriptor::Heading { .. }),
                     "Unexpected end of list"
                 );
-                self.postfix(desc);
+                self.close_frame(frame);
                 self.new_line();
 
                 println!("EndHeading");
@@ -521,12 +642,12 @@ impl Converter {
                 println!("EndBlockQuote");
             }
             TagEnd::CodeBlock => {
-                let desc = self.stack.pop().expect("Unexpected end of list");
+                let frame = self.stack.pop().expect("Unexpected end of list");
                 assert!(
-                    matches!(desc, Descriptor::CodeBlock { .. }),
+                    matches!(frame.desc, Descriptor::CodeBlock { .. }),
                     "Unexpected end of list"
                 );
-                self.postfix(desc);
+                self.close_frame(frame);
 
                 println!("EndCodeBlock");
             }
@@ -534,21 +655,22 @@ impl Converter {
                 println!("EndHtmlBlock");
             }
             TagEnd::List(_) => {
-                let desc = self.stack.pop().expect("Unexpected end of list");
+                let frame = self.stack.pop().expect("Unexpected end of list");
                 assert!(
-                    matches!(desc, Descriptor::List { .. }),
+                    matches!(frame.desc, Descriptor::List { .. }),
                     "Unexpected end of list"
                 );
-                self.postfix(desc);
+                self.close_frame(frame);
 
                 println!("EndList");
             }
             TagEnd::Item => {
-                let desc = self.stack.pop().expect("Unexpected end of list");
+                let frame = self.stack.pop().expect("Unexpected end of list");
                 assert!(
-                    matches!(desc, Descriptor::ListItem),
+                    matches!(frame.desc, Descriptor::ListItem),
                     "Unexpected end of list"
                 );
+                self.close_frame(frame);
                 self.new_line();
 
                 println!("EndItem");
@@ -577,29 +699,32 @@ impl Converter {
                 println!("EndSuperscript");
             }
             TagEnd::Emphasis => {
-                let desc = self.stack.pop().expect("Unexpected end of list");
+                let frame = self.stack.pop().expect("Unexpected end of list");
                 assert!(
-                    matches!(desc, Descriptor::Emphasis),
+                    matches!(frame.desc, Descriptor::Emphasis),
                     "Unexpected end of list"
                 );
-                self.postfix(desc);
+                self.close_frame(frame);
 
                 println!("EndEmphasis");
             }
             TagEnd::Strong => {
-                let desc = self.stack.pop().expect("Unexpected end of list");
-                assert!(matches!(desc, Descriptor::Strong), "Unexpected end of list");
-                self.postfix(desc);
+                let frame = self.stack.pop().expect("Unexpected end of list");
+                assert!(
+                    matches!(frame.desc, Descriptor::Strong),
+                    "Unexpected end of list"
+                );
+                self.close_frame(frame);
 
                 println!("EndStrong");
             }
             TagEnd::Strikethrough => {
-                let desc = self.stack.pop().expect("Unexpected end of list");
+                let frame = self.stack.pop().expect("Unexpected end of list");
                 assert!(
-                    matches!(desc, Descriptor::Strikethrough),
+                    matches!(frame.desc, Descriptor::Strikethrough),
                     "Unexpected end of list"
                 );
-                self.postfix(desc);
+                self.close_frame(frame);
             }
             TagEnd::Link => {
                 let link = self.link.take().expect("Unexpected end of list");

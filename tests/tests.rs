@@ -248,20 +248,20 @@ fn asdadasd() {
     transform_expect_1(input, expected);
 }
 
-// #[test]
-// fn splits_words_to_fit_len_5() {
-//     transform_expect_n("12345 12345", "12345===12345", 5);
-// }
+#[test]
+fn splits_words_to_fit_len_5() {
+    transform_expect_n("12345 12345", "12345===12345", 5);
+}
 
-// #[test]
-// fn splits_words_to_fit_len_10() {
-//     transform_expect_n("12345 12345", "12345===12345", 10);
-// }
+#[test]
+fn splits_words_to_fit_len_10() {
+    transform_expect_n("12345 12345", "12345===12345", 10);
+}
 
-// #[test]
-// fn keeps_words_when_len_allows() {
-//     transform_expect_n("12345 12345", "12345 12345", 11);
-// }
+#[test]
+fn keeps_words_when_len_allows() {
+    transform_expect_n("12345 12345", "12345 12345", 11);
+}
 
 // #[test]
 // fn splits_code_block_line_len_18() {
@@ -320,21 +320,13 @@ fn asdadasd() {
 //     transform_expect_n(input, expected, 80);
 // }
 
-// #[test]
-// fn asd() {
-//     transform_expect_1(
-//         "```rust\n1234567890\n```\n```java\n1234567890\n```",
-//         "```rust\n1234567890\n```\n```java\n1234567890\n```",
-//     );
-// }
-
-// #[test]
-// fn asd1() {
-//     transform_expect_1(
-//         "You need\n\n1. **Model**\n- `MODEL` test.",
-//         "You need\n1\\. *Model*\n  ⦁ `MODEL` test\\.",
-//     );
-// }
+#[test]
+fn asd() {
+    transform_expect_1(
+        "```rust\n1234567890\n```\n```java\n1234567890\n```",
+        "```rust\n1234567890\n```\n```java\n1234567890\n```",
+    );
+}
 
 // #[test]
 // fn test1() -> anyhow::Result<()> {
