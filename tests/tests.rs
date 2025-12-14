@@ -328,131 +328,131 @@ fn asd() {
     );
 }
 
-// #[test]
-// fn test1() -> anyhow::Result<()> {
-//     let input = include_str!("1-input.md");
-//     let chunks = Converter::default().go(input)?;
-//     let actual = chunks.join("===");
-//     let _expected = include_str!("1-output.txt");
+#[test]
+fn test1() -> anyhow::Result<()> {
+    let input = include_str!("1-input.md");
+    let chunks = Converter::default().go(input)?;
+    let actual = chunks.join("===");
+    let _expected = include_str!("1-output.txt");
 
-//     std::fs::write("tests/1-output.txt", &actual).unwrap();
-//     //assert_eq!(actual, expected);
+    std::fs::write("tests/1-output.txt", &actual).unwrap();
+    //assert_eq!(actual, expected);
 
-//     Ok(())
-// }
+    Ok(())
+}
 
-// #[test]
-// fn test2() -> anyhow::Result<()> {
-//     let input = include_str!("2-input.md");
-//     let chunks = Converter::default().go(input)?;
-//     let actual = chunks.join("===");
-//     let _expected = include_str!("2-output.txt");
+#[test]
+fn test2() -> anyhow::Result<()> {
+    let input = include_str!("2-input.md");
+    let chunks = Converter::default().go(input)?;
+    let actual = chunks.join("===");
+    let _expected = include_str!("2-output.txt");
 
-//     std::fs::write("tests/2-output.txt", &actual).unwrap();
-//     //assert_eq!(actual, expected);
+    std::fs::write("tests/2-output.txt", &actual).unwrap();
+    //assert_eq!(actual, expected);
 
-//     Ok(())
-// }
+    Ok(())
+}
 
-// #[test]
-// fn test3() -> anyhow::Result<()> {
-//     let input = include_str!("3-input.md");
-//     let chunks = Converter::default().go(input)?;
-//     let actual = chunks.join("===");
-//     let _expected = include_str!("3-output.txt");
+#[test]
+fn test3() -> anyhow::Result<()> {
+    let input = include_str!("3-input.md");
+    let chunks = Converter::default().go(input)?;
+    let actual = chunks.join("===");
+    let _expected = include_str!("3-output.txt");
 
-//     std::fs::write("tests/3-output.txt", &actual).unwrap();
-//     // assert_eq!(actual, expected);
+    std::fs::write("tests/3-output.txt", &actual).unwrap();
+    // assert_eq!(actual, expected);
 
-//     Ok(())
-// }
+    Ok(())
+}
 
-// #[test]
-// fn test4() -> anyhow::Result<()> {
-//     let input = include_str!("4-input.md");
-//     let chunks = Converter::default().go(input)?;
-//     let actual = chunks.join("===");
-//     let _expected = include_str!("4-output.txt");
+#[test]
+fn test4() -> anyhow::Result<()> {
+    let input = include_str!("4-input.md");
+    let chunks = Converter::default().go(input)?;
+    let actual = chunks.join("===");
+    let _expected = include_str!("4-output.txt");
 
-//     std::fs::write("tests/4-output.txt", &actual).unwrap();
-//     //assert_eq!(actual, expected);
+    std::fs::write("tests/4-output.txt", &actual).unwrap();
+    //assert_eq!(actual, expected);
 
-//     Ok(())
-// }
+    Ok(())
+}
 
-// #[test]
-// fn test5() -> anyhow::Result<()> {
-//     let input = include_str!("5-input.md");
-//     let chunks = Converter::default().go(input)?;
-//     let actual = chunks.join("===");
-//     let _expected = include_str!("5-output.txt");
+#[test]
+fn test5() -> anyhow::Result<()> {
+    let input = include_str!("5-input.md");
+    let chunks = Converter::default().go(input)?;
+    let actual = chunks.join("===");
+    let _expected = include_str!("5-output.txt");
 
-//     std::fs::write("tests/5-output.txt", &actual).unwrap();
-//     //assert_eq!(actual, expected);
+    std::fs::write("tests/5-output.txt", &actual).unwrap();
+    //assert_eq!(actual, expected);
 
-//     Ok(())
-// }
+    Ok(())
+}
 
-// #[test]
-// fn test6() -> anyhow::Result<()> {
-//     let input = include_str!("6-input.md");
-//     let chunks = Converter::default().go(input)?;
-//     let actual = chunks.join("===");
-//     let _expected = include_str!("6-output.txt");
+#[test]
+fn test6() -> anyhow::Result<()> {
+    let input = include_str!("6-input.md");
+    let chunks = Converter::default().go(input)?;
+    let actual = chunks.join("===");
+    let _expected = include_str!("6-output.txt");
 
-//     std::fs::write("tests/6-output.txt", &actual).unwrap();
-//     //assert_eq!(actual, expected);
+    std::fs::write("tests/6-output.txt", &actual).unwrap();
+    //assert_eq!(actual, expected);
 
-//     Ok(())
-// }
-// #[test]
-// fn test7() -> anyhow::Result<()> {
-//     let input = include_str!("7-input.md");
-//     let chunks = Converter::default().go(input)?;
-//     let actual = chunks.join("===");
-//     let _expected = include_str!("7-output.txt");
+    Ok(())
+}
+#[test]
+fn test7() -> anyhow::Result<()> {
+    let input = include_str!("7-input.md");
+    let chunks = Converter::default().go(input)?;
+    let actual = chunks.join("===");
+    let _expected = include_str!("7-output.txt");
 
-//     std::fs::write("tests/7-output.txt", &actual).unwrap();
-//     //assert_eq!(actual, expected);
+    std::fs::write("tests/7-output.txt", &actual).unwrap();
+    //assert_eq!(actual, expected);
 
-//     Ok(())
-// }
+    Ok(())
+}
 
-// #[test]
-// fn test8() -> anyhow::Result<()> {
-//     let input = include_str!("8-input.md");
-//     let chunks = Converter::default().go(input)?;
-//     let actual = chunks.join("===");
-//     let _expected = include_str!("8-output.txt");
+#[test]
+fn test8() -> anyhow::Result<()> {
+    let input = include_str!("8-input.md");
+    let chunks = Converter::default().go(input)?;
+    let actual = chunks.join("===");
+    let _expected = include_str!("8-output.txt");
 
-//     std::fs::write("tests/8-output.txt", &actual).unwrap();
-//     //assert_eq!(actual, expected);
+    std::fs::write("tests/8-output.txt", &actual).unwrap();
+    //assert_eq!(actual, expected);
 
-//     Ok(())
-// }
+    Ok(())
+}
 
-// #[test]
-// fn test9() -> anyhow::Result<()> {
-//     let input = include_str!("9-input.md");
-//     let chunks = Converter::default().go(input)?;
-//     let actual = chunks.join("===");
-//     let _expected = include_str!("9-output.txt");
+#[test]
+fn test9() -> anyhow::Result<()> {
+    let input = include_str!("9-input.md");
+    let chunks = Converter::default().go(input)?;
+    let actual = chunks.join("===");
+    let _expected = include_str!("9-output.txt");
 
-//     std::fs::write("tests/9-output.txt", &actual).unwrap();
-//     //assert_eq!(actual, expected);
+    std::fs::write("tests/9-output.txt", &actual).unwrap();
+    //assert_eq!(actual, expected);
 
-//     Ok(())
-// }
+    Ok(())
+}
 
-// #[test]
-// fn test10() -> anyhow::Result<()> {
-//     let input = include_str!("10-input.md");
-//     let chunks = Converter::default().go(input)?;
-//     let actual = chunks.join("===");
-//     let _expected = include_str!("10-output.txt");
+#[test]
+fn test10() -> anyhow::Result<()> {
+    let input = include_str!("10-input.md");
+    let chunks = Converter::default().go(input)?;
+    let actual = chunks.join("===");
+    let _expected = include_str!("10-output.txt");
 
-//     std::fs::write("tests/10-output.txt", &actual).unwrap();
-//     //assert_eq!(actual, expected);
+    std::fs::write("tests/10-output.txt", &actual).unwrap();
+    //assert_eq!(actual, expected);
 
-//     Ok(())
-// }
+    Ok(())
+}
